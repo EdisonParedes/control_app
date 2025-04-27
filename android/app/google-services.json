@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "607377803440",
+    "project_id": "apps-d19d9",
+    "storage_bucket": "apps-d19d9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:607377803440:android:889d6f42e184a0d6d65375",
+        "android_client_info": {
+          "package_name": "com.edisonparedes.apps"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcJNhw_liFVCv4NUhXLO2c_CMDenGWX9w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

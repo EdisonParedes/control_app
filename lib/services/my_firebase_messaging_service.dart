@@ -19,44 +19,10 @@ class MyFirebaseMessagingService {
       print('Permiso de notificaciones denegado');
     }
 
-    // Escuchar las notificaciones cuando la app está en primer plano
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print(
-        'Notificación recibida en primer plano: ${message.notification?.title}',
-      );
-
-      double latitude = double.tryParse(message.data['latitude'] ?? '0') ?? 0;
-      double longitude = double.tryParse(message.data['longitude'] ?? '0') ?? 0;
-
-      // Verifica si las coordenadas son válidas
-      if (latitude != 0 && longitude != 0) {
-        // Navegar a la pantalla del mapa con las coordenadas
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) =>
-                    MapScreen(latitude: latitude, longitude: longitude),
-          ),
-        );
-      } else {
-        // Si las coordenadas no son válidas, maneja el error o muestra un mensaje
-        print("No se recibieron coordenadas válidas");
-      }
-
-      // Aquí puedes mostrar un Snackbar o actualizar la UI
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message.notification?.body ?? 'Sin título')),
-      );
-    });
-
     // Escuchar cuando la app se abre desde una notificación (en segundo plano o cerrada)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('Notificación abierta: ${message.notification?.title}');
 
-      // Aquí puedes navegar a una pantalla específica de la app.
-      // Por ejemplo, si tienes un `navigatorKey` global:
-      // navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => SpecificPage()));
 
       // Acceder a los datos de la notificación
       double latitude = double.tryParse(message.data['latitude'] ?? '0') ?? 0;

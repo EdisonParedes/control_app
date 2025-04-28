@@ -1,4 +1,5 @@
 import 'package:app/screens/home_page.dart';
+import 'package:app/screens/myReportsPage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -31,9 +32,9 @@ class _NewReportPageState extends State<NewReportPage> {
       final user = FirebaseAuth.instance.currentUser;
 
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuario no autenticado')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Usuario no autenticado')));
         return;
       }
 
@@ -61,7 +62,7 @@ class _NewReportPageState extends State<NewReportPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => const NewReportPage()),
       );
     } catch (e) {
       print('Error al enviar el reporte: $e');
@@ -74,10 +75,16 @@ class _NewReportPageState extends State<NewReportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        //title: const Text('Noticias'), // El título que quieras
+        actionsPadding: EdgeInsets.only(right: 10, top: 10),
+        actions: [
+          _buildListReportsButton(context), // AQUÍ agregas el botón
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(left: 20.0, right: 20.0),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -151,6 +158,32 @@ class _NewReportPageState extends State<NewReportPage> {
         child: const Text(
           'Enviar Reporte',
           style: TextStyle(color: Colors.white70),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListReportsButton(BuildContext context) {
+    return SizedBox(
+      width: 150,
+      child: ElevatedButton(
+        onPressed:
+            () => {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MyReportsPage()),
+              ),
+            },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: const Text(
+          'Lista de Reportes',
+          style: TextStyle(color: Colors.white70,
+          fontSize: 12),
         ),
       ),
     );

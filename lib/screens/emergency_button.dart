@@ -38,14 +38,14 @@ class _EmergencyButtonState extends State<EmergencyButton> {
   bool isSending = false;
   final msgServer = FirebaseMessaging.instance;
   LatLng currentPosition = LatLng(0.0, 0.0);
-  bool isLongPressing = false; 
+  bool isLongPressing = false;
   Future<void>? _progressFuture;
   double progress = 0.0;
 
   double latitude = 0;
   double longitude = 0;
 
-  final get = get_server_key();  // Server Key de Firebase
+  final get = get_server_key(); // Server Key de Firebase
 
   @override
   void initState() {
@@ -53,11 +53,46 @@ class _EmergencyButtonState extends State<EmergencyButton> {
 
     // Configura la recepción de mensajes cuando la app esté en primer plano
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Notificación recibida en primer plano: ${message.notification?.title}');
-      // Muestra la notificación local cuando la app está en primer plano
-      _showNotification(
-        message.notification?.title ?? 'Alerta',
-        message.notification?.body ?? 'Mensaje de emergencia',
+      print(
+        'Notificación recibida en primer plano: ${message.notification?.title}',
+      );
+
+      // Obtener el ID del usuario que envió la notificación
+      String senderId =
+          message.data['senderId'] ??
+          ''; // Asegúrate de enviar 'senderId' cuando se manda la notificación
+
+      // Obtener el ID del usuario autenticado
+      String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+      // Si el usuario actual es el que envió la notificación, no hacer nada (evitar abrir el mapa)
+      if (senderId == currentUserId) {
+        print("No abrir el mapa, el usuario está enviando la notificación");
+        return; // Salir para que no se navegue
+      }
+
+      double latitude = double.tryParse(message.data['latitude'] ?? '0') ?? 0;
+      double longitude = double.tryParse(message.data['longitude'] ?? '0') ?? 0;
+
+      // Verifica si las coordenadas son válidas
+      if (latitude != 0 && longitude != 0) {
+        // Navegar a la pantalla del mapa con las coordenadas
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) =>
+                    MapScreen(latitude: latitude, longitude: longitude),
+          ),
+        );
+      } else {
+        // Si las coordenadas no son válidas, maneja el error o muestra un mensaje
+        print("No se recibieron coordenadas válidas");
+      }
+
+      // Aquí puedes mostrar un Snackbar o actualizar la UI
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message.notification?.body ?? 'Sin título')),
       );
     });
   }
@@ -88,7 +123,19 @@ class _EmergencyButtonState extends State<EmergencyButton> {
 
     // Obtener el nombre del usuario actual (supongo que el usuario está autenticado)
     User? user = FirebaseAuth.instance.currentUser;
-    String userName = user?.displayName ?? 'Usuario';
+    String userName = 'Usuario';
+    String userId = user!.uid;
+
+      userId = user.uid;
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        userName = '${data['nombre'] ?? 'Usuario'} ${data['apellido'] ?? ''}';
+      }
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -102,6 +149,7 @@ class _EmergencyButtonState extends State<EmergencyButton> {
           latitude,
           longitude,
           serverKey,
+          userId,
         );
       }
     }
@@ -113,7 +161,9 @@ class _EmergencyButtonState extends State<EmergencyButton> {
 
   // Función para mostrar la notificación local
   Future<void> _showNotification(String title, String body) async {
-    String userName = FirebaseAuth.instance.currentUser?.displayName ?? 'Usuario'; // Obtener nombre del usuario
+    String userName =
+        FirebaseAuth.instance.currentUser?.displayName ??
+        'Usuario'; // Obtener nombre del usuario
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -142,6 +192,7 @@ class _EmergencyButtonState extends State<EmergencyButton> {
     double latitude,
     double longitude,
     String serverKey,
+    String user,
   ) async {
     print('-------- FCM TOKEN ------ $token');
     final url = Uri.parse(
@@ -161,6 +212,7 @@ class _EmergencyButtonState extends State<EmergencyButton> {
             "latitude": latitude.toString(),
             "longitude": longitude.toString(),
             "story_id": "story_12345",
+            "senderId": user,
           },
         },
       }),

@@ -11,9 +11,9 @@ class _NewsScreenState extends State<NewsScreen> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(30),
+      padding: const EdgeInsets.all(40),
       children: [
-        Positioned(top: 40, right: 20, child: _buildNewReportButton(context)),
+        Positioned(top: 60, right: 20, child: _buildNewNewsButton(context)),
         const SizedBox(height: 20),
         ListTile(
           leading: Icon(Icons.warning, color: Colors.red),
@@ -30,7 +30,7 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Widget _buildNewReportButton(BuildContext context) {
+  Widget _buildNewNewsButton(BuildContext context) {
     return SizedBox(
       width: 150,
       child: ElevatedButton(

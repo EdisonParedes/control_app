@@ -38,9 +38,7 @@ class _LoginPageState extends State<LoginPage> {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
-          .update({
-        'fcmToken': fcmToken,
-      });
+          .update({'fcmToken': fcmToken});
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Sesión iniciada correctamente")),
@@ -58,6 +56,34 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  void _resetPassword() async {
+    if (_emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Por favor, ingresa tu correo para recuperar la contraseña.",
+          ),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Correo de recuperación enviado. Revisa tu bandeja de entrada.",
+          ),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error al enviar correo: ${e.message}")),
+      );
     }
   }
 
@@ -101,10 +127,7 @@ class _LoginPageState extends State<LoginPage> {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: const Text(
-          'Ingresar',
-          style: TextStyle(color: Colors.white70),
-        ),
+        child: const Text('Ingresar', style: TextStyle(color: Colors.white70)),
       ),
     );
   }
@@ -148,22 +171,41 @@ class _LoginPageState extends State<LoginPage> {
               _buildTextField(
                 'Correo electrónico',
                 _emailController,
-                validator: (value) =>
-                    value!.isEmpty ? 'Ingresa tu correo' : null,
+                validator:
+                    (value) => value!.isEmpty ? 'Ingresa tu correo' : null,
               ),
-              const SizedBox(height: 20),
+              _buildForgotPassword(),
+              const SizedBox(height: 10),
               _buildTextField(
                 'Contraseña',
                 _passwordController,
                 obscureText: true,
-                validator: (value) =>
-                    value!.isEmpty ? 'Ingresa tu contraseña' : null,
+                validator:
+                    (value) => value!.isEmpty ? 'Ingresa tu contraseña' : null,
               ),
               const SizedBox(height: 40),
-              _isLoading ? const CircularProgressIndicator() : _buildLoginButton(),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : _buildLoginButton(),
               const SizedBox(height: 20),
               _buildRegisterRedirect(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForgotPassword() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: _resetPassword,
+        child: const Text(
+          '¿Olvidaste tu contraseña?',
+          style: TextStyle(
+            decoration: TextDecoration.underline,
+            color: Colors.black54,
           ),
         ),
       ),

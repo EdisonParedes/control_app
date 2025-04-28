@@ -10,7 +10,7 @@ import 'package:app/services/my_firebase_messaging_service.dart';
 // Definir el GlobalKey para el navigator globalmente
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await EmergencyButton.init();

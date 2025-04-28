@@ -190,7 +190,9 @@ class _ProfileScreen extends State<ProfileScreen> {
       if (value.length > 2) {
         return value[0] + '*' * (value.length - 2) + value[value.length - 1];
       }
+    } else if (label == 'Rol' && value.isNotEmpty) {
+      return value[0] + '*' * (value.length - 2) + value[value.length - 1];
     }
-    return value; // Si no aplica, no cambia
+    return value;
   }
 }

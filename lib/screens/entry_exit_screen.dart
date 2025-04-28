@@ -1,7 +1,15 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:app/screens/pdf_Generation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+import 'package:app/screens/ExcelGenerator.dart';
+import 'package:share_plus/share_plus.dart'; 
 
 class EntryExitScreen extends StatefulWidget {
   const EntryExitScreen({super.key});
@@ -80,10 +88,22 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     }
   }
 
+  bool _isAuthorizedUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    // Aquí deberías tener cargado el "rol" del usuario.
+    // Simulamos por ahora que el rol está guardado en alguna variable.
+    String? userRole =
+        'admin'; // <-- Simulación. Luego debes traer el rol real.
+
+    return userRole == 'admin' ||
+        userRole == 'representante' ||
+        userRole == 'guardia' ||
+        userRole == 'supervisor';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      //ppBar: AppBar(title: const Text('Control de Ingreso y Salida')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -91,7 +111,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 30),
               Center(
                 child: Text(
                   'Control de Ingreso y Salida',
@@ -146,6 +166,19 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
               ),
               const SizedBox(height: 24),
               Center(child: _buildRegisterButton()),
+              const SizedBox(height: 10),
+
+              if (_isAuthorizedUser())
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildExportPdfButton(),
+                      const SizedBox(width: 5),
+                      _buildExportExcelButton(),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -205,6 +238,57 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
           ),
         ),
         child: const Text('Registrar', style: TextStyle(color: Colors.white70)),
+      ),
+    );
+  }
+
+  Future<void> _exportToPdf() async {
+    final pdfData = await PdfGenerator.generatePdf();
+
+    // Mostrar el PDF o imprimirlo directamente
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdfData);
+  }
+
+  Future<void> _exportToExcel() async {
+  final excelData = await ExcelGenerator.generateExcel();
+
+  // Guardarlo temporalmente
+  final directory = await getTemporaryDirectory();
+  final filePath = '${directory.path}/reporte.xlsx';
+  final file = File(filePath);
+  await file.writeAsBytes(excelData);
+
+  // Compartirlo o abrirlo
+  await Share.shareXFiles([XFile(filePath)], text: 'Aquí está el reporte Excel 📄');
+}
+
+
+  Widget _buildExportPdfButton() {
+    return ElevatedButton.icon(
+      onPressed: _exportToPdf,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      icon: const Icon(Icons.picture_as_pdf, color: Colors.white70),
+      label: const Text(
+        'Exportar PDF',
+        style: TextStyle(color: Colors.white70),
+      ),
+    );
+  }
+
+  Widget _buildExportExcelButton() {
+    return ElevatedButton.icon(
+      onPressed: _exportToExcel,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      icon: const Icon(Icons.grid_on, color: Colors.white70),
+      label: const Text(
+        'Exportar Excel',
+        style: TextStyle(color: Colors.white70),
       ),
     );
   }

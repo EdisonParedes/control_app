@@ -203,10 +203,7 @@ class _LoginPageState extends State<LoginPage> {
         onPressed: _resetPassword,
         child: const Text(
           '¿Olvidaste tu contraseña?',
-          style: TextStyle(
-            decoration: TextDecoration.underline,
-            color: Colors.black54,
-          ),
+          style: TextStyle(decoration: TextDecoration.underline),
         ),
       ),
     );

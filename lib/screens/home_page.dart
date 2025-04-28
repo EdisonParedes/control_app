@@ -1,8 +1,8 @@
 import 'package:app/screens/map_screen.dart';
 import 'package:app/screens/news_screen.dart';
 import 'package:app/screens/reports_screen.dart';
-import 'package:app/screens/entryExitScreen.dart';
-import 'package:app/screens/NewReport_page.dart';
+import 'package:app/screens/entry_exit_screen.dart';
+import 'package:app/screens/new_report_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';

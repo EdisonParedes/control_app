@@ -69,15 +69,18 @@ class _RegisterPage extends State<RegisterPage> {
             'createdAt': FieldValue.serverTimestamp(),
           });
 
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Usuario registrado correctamente")),
       );
 
       Navigator.pushReplacement(
+        // ignore: use_build_context_synchronously
         context,
         MaterialPageRoute(builder: (context) => const LoginPage()),
       );
     } on FirebaseAuthException catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error al registrar: ${e.message}")),
       );

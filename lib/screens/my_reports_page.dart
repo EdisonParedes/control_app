@@ -22,7 +22,6 @@ class _MyReportsPageState extends State<MyReportsPage> {
   Future<void> _loadReports() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      // Si el usuario no está autenticado, no mostrar los reportes
       return;
     }
 

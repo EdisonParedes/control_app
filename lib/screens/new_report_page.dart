@@ -43,7 +43,7 @@ class _NewReportPageState extends State<NewReportPage> {
         'title': incidentName,
         'description': description,
         'location': location,
-        'coordinates': '', // Aquí puedes luego agregar coordenadas reales
+        'coordinates': '',
         'status': 'pendiente',
         'createdAt': now.toIso8601String(),
         'updatedAt': now.toIso8601String(),

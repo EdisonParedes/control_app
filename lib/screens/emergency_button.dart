@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:app/services/serverkey.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,10 +7,12 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart'; // Paquete para obtener la ubicación
-import 'package:app/services/location_permission_service.dart'; // Importa el servicio de permisos
+import 'package:latlong2/latlong.dart';
+import 'package:app/services/location_permission_service.dart';
 import 'package:app/screens/map_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:app/services/user_session.dart';
+import 'package:provider/provider.dart';
 
 class EmergencyButton extends StatefulWidget {
   @override
@@ -36,61 +39,37 @@ class EmergencyButton extends StatefulWidget {
 
 class _EmergencyButtonState extends State<EmergencyButton> {
   bool isSending = false;
-  final msgServer = FirebaseMessaging.instance;
+  bool isCompleted = false;
   LatLng currentPosition = LatLng(0.0, 0.0);
-  bool isLongPressing = false;
-  Future<void>? _progressFuture;
-  double progress = 0.0;
-
   double latitude = 0;
   double longitude = 0;
-
-  final get = get_server_key(); // Server Key de Firebase
+  final get = get_server_key();
+  Timer? holdTimer;
+  DateTime? pressStartTime;
 
   @override
   void initState() {
     super.initState();
 
-    // Configura la recepción de mensajes cuando la app esté en primer plano
+    context.read<UserSession>().cargarDatosUsuario();
+
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print(
-        'Notificación recibida en primer plano: ${message.notification?.title}',
-      );
-
-      // Obtener el ID del usuario que envió la notificación
-      String senderId =
-          message.data['senderId'] ??
-          ''; // Asegúrate de enviar 'senderId' cuando se manda la notificación
-
-      // Obtener el ID del usuario autenticado
+      String senderId = message.data['senderId'] ?? '';
       String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-      // Si el usuario actual es el que envió la notificación, no hacer nada (evitar abrir el mapa)
-      if (senderId == currentUserId) {
-        print("No abrir el mapa, el usuario está enviando la notificación");
-        return; // Salir para que no se navegue
-      }
+      if (senderId == currentUserId) return;
 
       double latitude = double.tryParse(message.data['latitude'] ?? '0') ?? 0;
       double longitude = double.tryParse(message.data['longitude'] ?? '0') ?? 0;
 
-      // Verifica si las coordenadas son válidas
       if (latitude != 0 && longitude != 0) {
-        // Navegar a la pantalla del mapa con las coordenadas
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) =>
-                    MapScreen(latitude: latitude, longitude: longitude),
+            builder: (context) => MapScreen(latitude: latitude, longitude: longitude),
           ),
         );
-      } else {
-        // Si las coordenadas no son válidas, maneja el error o muestra un mensaje
-        print("No se recibieron coordenadas válidas");
       }
 
-      // Aquí puedes mostrar un Snackbar o actualizar la UI
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message.notification?.body ?? 'Sin título')),
       );
@@ -102,7 +81,6 @@ class _EmergencyButtonState extends State<EmergencyButton> {
     final message = 'Emergencia activada en la comunidad Llimpe Grande.';
     String serverKey = await get.server_token();
 
-    // Intentar obtener la ubicación, pero no bloquear si no se obtiene
     Position? position;
     try {
       position = await LocationPermissionService.requestLocationPermission();
@@ -110,39 +88,25 @@ class _EmergencyButtonState extends State<EmergencyButton> {
       print('Error al obtener ubicación: $e');
     }
 
-    // Si no se obtuvo la ubicación, usar valores predeterminados
     if (position != null) {
       latitude = position.latitude;
       longitude = position.longitude;
-    } else {
-      latitude = 0.0;
-      longitude = 0.0;
     }
 
-    String locationMessage = '$message';
-
-    // Obtener el nombre del usuario actual (supongo que el usuario está autenticado)
     User? user = FirebaseAuth.instance.currentUser;
     String userName = 'Usuario';
     String userId = user!.uid;
 
-      userId = user.uid;
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
-        userName = '${data['nombre'] ?? 'Usuario'} ${data['apellido'] ?? ''}';
-      }
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      final data = userDoc.data()!;
+      userName = '${data['nombre'] ?? 'Usuario'} ${data['apellido'] ?? ''}';
+    }
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
-      final token = data.containsKey('fcmToken') ? data['fcmToken'] : null;
-
+      final token = data['fcmToken'];
       if (token != null && token.toString().isNotEmpty) {
-        // Enviar la notificación con el nombre del usuario
         await sendPushMessage(
           token,
           '$message - $userName',
@@ -154,36 +118,11 @@ class _EmergencyButtonState extends State<EmergencyButton> {
       }
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Notificaciones de emergencia enviadas')),
-    );
-  }
-
-  // Función para mostrar la notificación local
-  Future<void> _showNotification(String title, String body) async {
-    String userName =
-        FirebaseAuth.instance.currentUser?.displayName ??
-        'Usuario'; // Obtener nombre del usuario
-
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'emergency_channel',
-          'Emergency Notifications',
-          importance: Importance.high,
-          priority: Priority.high,
-          ticker: 'ticker',
-        );
-    const NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-    );
-
-    // Mostrar la notificación local con el nombre del usuario
-    await EmergencyButton.flutterLocalNotificationsPlugin.show(
-      0,
-      '$title - $userName', // Incluye el nombre del usuario en el título
-      body,
-      platformDetails,
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Notificaciones de emergencia enviadas')),
+      );
+    }
   }
 
   Future<void> sendPushMessage(
@@ -194,7 +133,6 @@ class _EmergencyButtonState extends State<EmergencyButton> {
     String serverKey,
     String user,
   ) async {
-    print('-------- FCM TOKEN ------ $token');
     final url = Uri.parse(
       'https://fcm.googleapis.com/v1/projects/apps-d19d9/messages:send',
     );
@@ -225,34 +163,81 @@ class _EmergencyButtonState extends State<EmergencyButton> {
     }
   }
 
-  // Función de long press para enviar la notificación de emergencia después de 10 segundos
-  void _handleLongPress() {
-    if (!isSending) {
-      setState(() => isSending = true);
-      Future.delayed(Duration(seconds: 10), () async {
-        await _sendEmergencyNotifications();
-        setState(() => isSending = false);
-      });
+  void _startHoldTimer() {
+    setState(() {
+      isSending = true;
+      isCompleted = false;
+    });
+
+    holdTimer = Timer(Duration(seconds: 10), () async {
+      await _sendEmergencyNotifications();
+
+      if (mounted) {
+        setState(() {
+          isSending = false;
+          isCompleted = true;
+        });
+
+        Future.delayed(Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() => isCompleted = false);
+          }
+        });
+      }
+    });
+  }
+
+  void _cancelHoldTimer() {
+    if (holdTimer != null && holdTimer!.isActive) {
+      holdTimer!.cancel();
+      print('Botón soltado antes de los 10 segundos. Emergencia cancelada.');
     }
+
+    setState(() {
+      isSending = false;
+      isCompleted = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onLongPress: _handleLongPress,
-      child: FloatingActionButton(
-        backgroundColor: Colors.red,
-        child: Icon(Icons.warning),
-        onPressed: () {},
+      onLongPressStart: (_) => _startHoldTimer(),
+      onLongPressEnd: (_) => _cancelHoldTimer(),
+      child: Container(
+        width: 65,
+        height: 65,
+        decoration: BoxDecoration(
+          color: isCompleted
+              ? Colors.green
+              : (isSending ? Colors.orange : Colors.red),
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+        ),
+        child: Center(
+          child: isSending
+              ? SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 3,
+                  ),
+                )
+              : Icon(
+                  isCompleted ? Icons.check : Icons.warning,
+                  color: Colors.white,
+                  size: 40,
+                ),
+        ),
       ),
     );
   }
 }
 
-// Función estática o de nivel superior para manejar la notificación cuando la app esté en segundo plano o cerrada
+// Manejo de notificación en segundo plano
 Future<void> backgroundNotificationHandler(
   NotificationResponse notificationResponse,
 ) async {
   print('Notificación de fondo: ${notificationResponse.payload}');
-  // Aquí puedes manejar la notificación de fondo
 }

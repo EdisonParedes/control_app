@@ -6,16 +6,23 @@ import 'auth/login_page.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:app/services/my_firebase_messaging_service.dart';
+import 'package:provider/provider.dart';
+import 'package:app/services/user_session.dart'; 
 
 // Definir el GlobalKey para el navigator globalmente
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-void main() async{
+  
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await EmergencyButton.init();
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => UserSession(),
+      child: const MyApp(),
+    ),
+  );
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
     MyFirebaseMessagingService.setupFirebaseMessaging(
@@ -30,12 +37,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey:
-          navigatorKey, // Usamos el navigatorKey para la navegación global
-      title: 'App',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const LoginPage(), // Cambié HomePage por LoginPage si necesitas
+      home: const HomePage(),
     );
   }
 }

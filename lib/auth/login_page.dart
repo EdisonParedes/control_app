@@ -40,11 +40,13 @@ class _LoginPageState extends State<LoginPage> {
           .doc(userCredential.user!.uid)
           .update({'fcmToken': fcmToken});
 
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Sesión iniciada correctamente")),
       );
 
       Navigator.pushReplacement(
+        // ignore: use_build_context_synchronously
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );

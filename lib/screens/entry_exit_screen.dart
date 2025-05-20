@@ -22,20 +22,24 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   final TextEditingController _plateController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
 
-  bool _isLoading = false;
-
   String _accessType = 'Ingreso';
+  String _personType = 'Residente';
+  String? _selectedReason;
+  final List<String> _motivosVisita = [
+    'Entrega',
+    'Reunión',
+    'Servicio Técnico',
+    'Visita Familiar',
+    'Otro',
+  ];
 
   Future<void> _registerAccess() async {
-    String cedula = _idController.text.trim();
-
     if (!_formKey.currentState!.validate()) return;
 
-    final dni = _idController.text.trim();
+    String dni = _idController.text.trim();
 
     if (_accessType == 'Ingreso') {
-      if (await cedulaTieneIngresoSinSalidaHoy(cedula)) {
-        // Mostrar alerta
+      if (await cedulaTieneIngresoSinSalidaHoy(dni)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Esta cédula ya fue registrada hoy.')),
         );
@@ -48,7 +52,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
         'lastname': _lastnameController.text.trim(),
         'dni': dni,
         'plate': _plateController.text.trim(),
-        'reason': _reasonController.text.trim(),
+        'reason': _personType == 'Visitante' ? _selectedReason : 'Residente',
         'dateIn': Timestamp.now(),
         'dateOut': null,
         'timestamp': FieldValue.serverTimestamp(),
@@ -58,7 +62,6 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
         SnackBar(content: Text('Ingreso registrado exitosamente.')),
       );
     } else {
-      // Lógica para registrar SALIDA
       final query =
           await FirebaseFirestore.instance
               .collection('access')
@@ -81,7 +84,6 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
       }
 
       final docRef = query.docs.first.reference;
-
       await docRef.update({'dateOut': Timestamp.now()});
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -95,37 +97,30 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
 
   Future<bool> isAuthorizedUser() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-
     if (uid != null) {
       final doc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final userRole = doc.data()?['rol'];
-
       return userRole == 'admin';
     }
-
     return false;
   }
 
   String? validateCedulaEcuatoriana(String? cedula) {
-    if (cedula == null || cedula.isEmpty) {
+    if (cedula == null || cedula.isEmpty)
       return 'El campo de cédula no puede estar vacío';
-    }
-    if (!RegExp(r'^\d{10}$').hasMatch(cedula)) {
-      return 'La cédula debe tener exactamente 10 dígitos \nnuméricos';
-    }
+    if (!RegExp(r'^\d{10}$').hasMatch(cedula))
+      return 'La cédula debe tener 10 dígitos numéricos';
 
     final digits = cedula.split('').map(int.parse).toList();
     final provinceCode = int.parse(cedula.substring(0, 2));
     final thirdDigit = digits[2];
 
-    if (provinceCode < 1 || provinceCode > 24) {
-      return 'El código de provincia (dos primeros dígitos)\n no es válido';
-    }
-    if (thirdDigit >= 6) {
-      return 'El tercer dígito no es válido para una cédula\n ecuatoriana';
-    }
-    // Algoritmo de validación del dígito verificador (módulo 10)
+    if (provinceCode < 1 || provinceCode > 24)
+      return 'Código de provincia inválido';
+    if (thirdDigit >= 6)
+      return 'Tercer dígito inválido para cédula ecuatoriana';
+
     int suma = 0;
     for (int i = 0; i < 9; i++) {
       int valor = digits[i];
@@ -138,10 +133,28 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     int verificador = 10 - (suma % 10);
     if (verificador == 10) verificador = 0;
 
-    if (verificador != digits[9]) {
-      return 'La cédula ingresada no es válida';
-    }
-    return null; // ✅ Cédula válida
+    if (verificador != digits[9]) return 'La cédula ingresada no es válida';
+    return null;
+  }
+
+  Future<bool> cedulaTieneIngresoSinSalidaHoy(String cedula) async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final query =
+        await FirebaseFirestore.instance
+            .collection('access')
+            .where('dni', isEqualTo: cedula)
+            .where(
+              'dateIn',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+            )
+            .where('dateIn', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+            .where('dateOut', isNull: true)
+            .get();
+
+    return query.docs.isNotEmpty;
   }
 
   Future<List<Map<String, dynamic>>> obtenerDatosDeAccesos() async {
@@ -171,140 +184,28 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 30),
-                Center(
-                  child: Text(
-                    'Control de Ingreso y Salida',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Row(
-                  children: [
-                    const Text(
-                      'Tipo de acceso:',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 10),
-                    DropdownButton<String>(
-                      value: _accessType,
-                      items:
-                          ['Ingreso', 'Salida'].map((tipo) {
-                            return DropdownMenuItem(
-                              value: tipo,
-                              child: Text(tipo),
-                            );
-                          }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _accessType = value!;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+  Future<void> _exportToPdf() async {
+    final datos = await obtenerDatosDeAccesos();
+    final pdfData = await PdfGenerator.generatePdf(datos);
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdfData);
+  }
 
-                // Solo si es INGRESO
-                if (_accessType == 'Ingreso') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(
-                          'Nombre',
-                          _nameController,
-                          validator:
-                              (value) =>
-                                  value!.isEmpty
-                                      ? 'Este campo es obligatorio'
-                                      : null,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildTextField(
-                          'Apellido',
-                          _lastnameController,
-                          validator:
-                              (value) =>
-                                  value!.isEmpty
-                                      ? 'Este campo es obligatorio'
-                                      : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                ],
-
-                // Siempre mostrar cédula
-                _buildTextField(
-                  'Cédula',
-                  _idController,
-                  validator: validateCedulaEcuatoriana,
-                ),
-                const SizedBox(height: 20),
-
-                // Solo si es INGRESO
-                if (_accessType == 'Ingreso') ...[
-                  _buildTextField(
-                    'Placa del vehículo (opcional)',
-                    _plateController,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    'Motivo de la visita',
-                    _reasonController,
-                    validator:
-                        (value) =>
-                            value!.isEmpty ? 'Este campo es obligatorio' : null,
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Botón Registrar
-                Center(child: _buildRegisterButton()),
-                const SizedBox(height: 10),
-
-                // Botones visibles solo para usuarios autorizados
-                FutureBuilder<bool>(
-                  future: isAuthorizedUser(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasData && snapshot.data == true) {
-                      return Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildExportPdfButton(),
-                            const SizedBox(width: 5),
-                            _buildExportExcelButton(),
-                          ],
-                        ),
-                      );
-                    } else {
-                      return const SizedBox(); // No muestra nada si no es autorizado
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  Future<void> _exportToExcel() async {
+    final data = await obtenerDatosDeAccesos();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ExcelPreviewScreen(ingresos: data)),
     );
+  }
+
+  void _clearControllers() {
+    _nameController.clear();
+    _lastnameController.clear();
+    _idController.clear();
+    _plateController.clear();
+    _reasonController.clear();
+    _selectedReason = null;
+    _personType = 'Residente';
   }
 
   Widget _buildTextField(
@@ -312,7 +213,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     TextEditingController controller, {
     bool obscureText = false,
     String? hintText,
-    String? Function(String?)? validator, // Agregamos el validator aquí
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,56 +264,6 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     );
   }
 
-  Future<bool> cedulaTieneIngresoSinSalidaHoy(String cedula) async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
-    final query =
-        await FirebaseFirestore.instance
-            .collection('access')
-            .where('dni', isEqualTo: cedula)
-            .where(
-              'dateIn',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-            )
-            .where('dateIn', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
-            .where('dateOut', isNull: true)
-            .get();
-
-    return query.docs.isNotEmpty;
-  }
-
-  Future<List<Map<String, dynamic>>> getIngresos() async {
-    List<Map<String, dynamic>> ingresosList = [];
-    try {
-      QuerySnapshot querySnapshot =
-          await FirebaseFirestore.instance.collection('access').get();
-
-      for (var doc in querySnapshot.docs) {
-        ingresosList.add(doc.data() as Map<String, dynamic>);
-      }
-    } catch (e) {
-      print('Error al obtener ingresos: $e');
-    }
-    return ingresosList;
-  }
-
-  Future<void> _exportToPdf() async {
-    final datos = await obtenerDatosDeAccesos();
-    final pdfData = await PdfGenerator.generatePdf(datos);
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdfData);
-  }
-
-  Future<void> _exportToExcel() async {
-    final data = await obtenerDatosDeAccesos();
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ExcelPreviewScreen(ingresos: data)),
-    );
-  }
-
   Widget _buildExportPdfButton() {
     return ElevatedButton.icon(
       onPressed: _exportToPdf,
@@ -443,11 +294,175 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     );
   }
 
-  void _clearControllers() {
-    _nameController.clear();
-    _lastnameController.clear();
-    _idController.clear();
-    _plateController.clear();
-    _reasonController.clear();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 30),
+                Center(
+                  child: Text(
+                    'Control de Ingreso y Salida',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    const Text(
+                      'Tipo de acceso:',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    DropdownButton<String>(
+                      value: _accessType,
+                      items:
+                          ['Ingreso', 'Salida']
+                              .map(
+                                (tipo) => DropdownMenuItem(
+                                  value: tipo,
+                                  child: Text(tipo),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _accessType = value!;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (_accessType == 'Ingreso') ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          'Nombre',
+                          _nameController,
+                          validator:
+                              (v) => v!.isEmpty ? 'Campo requerido' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildTextField(
+                          'Apellido',
+                          _lastnameController,
+                          validator:
+                              (v) => v!.isEmpty ? 'Campo requerido' : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                _buildTextField(
+                  'Cédula',
+                  _idController,
+                  validator: validateCedulaEcuatoriana,
+                ),
+                const SizedBox(height: 16),
+                if (_accessType == 'Ingreso') ...[
+                  Row(
+                    children: [
+                      const Text(
+                        'Tipo de persona:',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(width: 10),
+                      DropdownButton<String>(
+                        value: _personType,
+                        items:
+                            ['Residente', 'Visitante']
+                                .map(
+                                  (tipo) => DropdownMenuItem(
+                                    value: tipo,
+                                    child: Text(tipo),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _personType = value!;
+                            _selectedReason = null;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    'Placa del vehículo (opcional)',
+                    _plateController,
+                  ),
+                  const SizedBox(height: 16),
+                  if (_personType == 'Visitante')
+                    DropdownButtonFormField<String>(
+                      value: _selectedReason,
+                      decoration: InputDecoration(
+                        labelText: 'Motivo de la visita',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      items:
+                          _motivosVisita
+                              .map(
+                                (motivo) => DropdownMenuItem(
+                                  value: motivo,
+                                  child: Text(motivo),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedReason = value;
+                        });
+                      },
+                      validator:
+                          (value) =>
+                              _personType == 'Visitante' && value == null
+                                  ? 'Debe seleccionar un motivo'
+                                  : null,
+                    ),
+                  const SizedBox(height: 24),
+                ],
+                Center(child: _buildRegisterButton()),
+                const SizedBox(height: 10),
+                FutureBuilder<bool>(
+                  future: isAuthorizedUser(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasData && snapshot.data == true) {
+                      return Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildExportPdfButton(),
+                            const SizedBox(width: 5),
+                            _buildExportExcelButton(),
+                          ],
+                        ),
+                      );
+                    } else {
+                      return const SizedBox();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

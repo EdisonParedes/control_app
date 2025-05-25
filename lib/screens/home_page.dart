@@ -91,7 +91,7 @@ class _HomePageState extends State<HomePage> {
     List<BottomNavigationBarItem> navigationItems = [];
     List<Widget> screenWidgets = [];
 
-    if (_userRole == 'residente') {
+    if (_userRole == 'residente' || _userRole == 'visitante') {
       navigationItems.addAll([
         const BottomNavigationBarItem(
           icon: Icon(Icons.report),

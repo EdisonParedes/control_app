@@ -1,10 +1,18 @@
 import 'package:app/screens/ExcelPreviewScreen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:app/screens/pdf_Generation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:app/services/my_firebase_messaging_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
+import 'package:app/services/serverkey.dart';
+import 'package:app/screens/scan_QR_screen.dart';
+import 'package:app/screens/visitor_approval_screen.dart';
 
 class EntryExitScreen extends StatefulWidget {
   const EntryExitScreen({super.key});
@@ -21,6 +29,8 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _plateController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  bool _isLoading = false;
 
   String _accessType = 'Ingreso';
   String _personType = 'Residente';
@@ -33,35 +43,141 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     'Otro',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+  }
+
   Future<void> _registerAccess() async {
     if (!_formKey.currentState!.validate()) return;
 
+    setState(() => _isLoading = true);
+
     String dni = _idController.text.trim();
+    String residentPhone = _phoneController.text.trim();
+    String name = _nameController.text.trim();
+    String lastname = _lastnameController.text.trim();
+    String plate = _plateController.text.trim();
 
     if (_accessType == 'Ingreso') {
+      // Validar ingreso duplicado
       if (await cedulaTieneIngresoSinSalidaHoy(dni)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Esta cédula ya fue registrada hoy.')),
+          SnackBar(
+            content: Text('Esta cédula ya tiene un ingreso sin salida.'),
+          ),
         );
-        _clearControllers();
+        setState(() => _isLoading = false);
         return;
       }
 
+      if (_personType == 'Visitante') {
+        if (_selectedReason == null || _selectedReason!.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Debe seleccionar un motivo de visita.')),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        if (!RegExp(r'^\d{10}$').hasMatch(residentPhone)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Número de teléfono inválido.')),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        final token = await getFcmTokenByPhoneNumber(residentPhone);
+        if (token == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No se encontró token del residente.')),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        final requestId = DateTime.now().millisecondsSinceEpoch.toString();
+        final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+        // 1. Crear solicitud en Firestore
+        await FirebaseFirestore.instance
+            .collection('access_requests')
+            .doc(requestId)
+            .set({
+              'visitorName': name,
+              'visitorCi': dni,
+              'reason': _selectedReason,
+              'status': 'Pendiente',
+              'createdAt': Timestamp.now(),
+            });
+
+        // 2. Enviar notificación push
+        await sendPushMessage(
+          token,
+          name,
+          dni,
+          _selectedReason!,
+          requestId,
+          userId,
+        );
+
+        // 3. Escuchar aprobación
+        FirebaseFirestore.instance
+            .collection('access_requests')
+            .doc(requestId)
+            .snapshots()
+            .listen((snapshot) async {
+              if (!snapshot.exists) return;
+              final status = snapshot.data()?['status'];
+              if (status == 'Aprobado') {
+                await FirebaseFirestore.instance.collection('access').add({
+                  'name': name,
+                  'lastname': lastname,
+                  'dni': dni,
+                  'plate': plate,
+                  'reason': _selectedReason,
+                  'phone': residentPhone,
+                  'dateIn': Timestamp.now(),
+                  'dateOut': null,
+                  'timestamp': FieldValue.serverTimestamp(),
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Ingreso aprobado y registrado.')),
+                );
+                _formKey.currentState!.reset();
+                _clearControllers();
+                setState(() => _isLoading = false);
+              } else if (status == 'Rechazado') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('El residente rechazó el ingreso.')),
+                );
+                setState(() => _isLoading = false);
+              }
+            });
+
+        return;
+      }
+
+      // Si es residente, registrar directamente
       await FirebaseFirestore.instance.collection('access').add({
-        'name': _nameController.text.trim(),
-        'lastname': _lastnameController.text.trim(),
+        'name': name,
+        'lastname': lastname,
         'dni': dni,
-        'plate': _plateController.text.trim(),
-        'reason': _personType == 'Visitante' ? _selectedReason : 'Residente',
+        'plate': plate,
+        'reason': 'Residente',
+        'phone': null,
         'dateIn': Timestamp.now(),
         'dateOut': null,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ingreso registrado exitosamente.')),
+        SnackBar(content: Text('Ingreso de residente registrado.')),
       );
     } else {
+      // Salida
       final query =
           await FirebaseFirestore.instance
               .collection('access')
@@ -73,18 +189,13 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
 
       if (query.docs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'No se encontró un ingreso pendiente para esta cédula.',
-            ),
-          ),
+          SnackBar(content: Text('No se encontró un ingreso pendiente.')),
         );
-        _clearControllers();
+        setState(() => _isLoading = false);
         return;
       }
 
-      final docRef = query.docs.first.reference;
-      await docRef.update({'dateOut': Timestamp.now()});
+      await query.docs.first.reference.update({'dateOut': Timestamp.now()});
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Salida registrada exitosamente.')),
@@ -93,6 +204,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
 
     _formKey.currentState!.reset();
     _clearControllers();
+    setState(() => _isLoading = false);
   }
 
   Future<bool> isAuthorizedUser() async {
@@ -252,14 +364,27 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     return SizedBox(
       width: 150,
       child: ElevatedButton(
-        onPressed: _registerAccess,
+        onPressed: _isLoading ? null : _registerAccess,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: const Text('Registrar', style: TextStyle(color: Colors.white70)),
+        child:
+            _isLoading
+                ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : const Text(
+                  'Registrar',
+                  style: TextStyle(color: Colors.white70),
+                ),
       ),
     );
   }
@@ -337,10 +462,15 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
                         });
                       },
                     ),
+                    const SizedBox(width: 10),
                   ],
                 ),
                 const SizedBox(height: 16),
+                /* Center(child: _buildQrScanButton()),
+                const SizedBox(height: 16), */
                 if (_accessType == 'Ingreso') ...[
+                  Center(child: _buildQrScanButton()),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
@@ -404,7 +534,8 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
                     _plateController,
                   ),
                   const SizedBox(height: 16),
-                  if (_personType == 'Visitante')
+                  if (_personType == 'Visitante') ...[
+                    const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
                       value: _selectedReason,
                       decoration: InputDecoration(
@@ -427,13 +558,30 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
                           _selectedReason = value;
                         });
                       },
-                      validator:
-                          (value) =>
-                              _personType == 'Visitante' && value == null
-                                  ? 'Debe seleccionar un motivo'
-                                  : null,
+                      validator: (value) {
+                        if (_personType == 'Visitante' &&
+                            (value == null || value.isEmpty)) {
+                          return 'Debe seleccionar un motivo';
+                        }
+                        return null;
+                      },
                     ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      'Teléfono del residente',
+                      _phoneController,
+                      validator: (v) {
+                        if (_personType == 'Visitante') {
+                          if (v == null || v.trim().isEmpty)
+                            return 'Campo requerido';
+                          if (!RegExp(r'^\d{10}$').hasMatch(v))
+                            return 'Número inválido';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ],
                 Center(child: _buildRegisterButton()),
                 const SizedBox(height: 10),
@@ -464,5 +612,93 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildQrScanButton() {
+    return SizedBox(
+      width: 150,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ScanQRScreen()),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blueGrey,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+        label: const Text('Código QR', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+}
+
+Future<String?> getFcmTokenByPhoneNumber(String phoneNumber) async {
+  try {
+    final querySnapshot =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .where('phone', isEqualTo: phoneNumber)
+            .limit(1)
+            .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      final data = querySnapshot.docs.first.data();
+      return data['fcmToken'] as String?;
+    } else {
+      print('No user found with phone number $phoneNumber');
+      return null;
+    }
+  } catch (e) {
+    print('Error fetching FCM token from users: $e');
+    return null;
+  }
+}
+
+Future<void> sendPushMessage(
+  String token,
+  String visitorName,
+  String visitorCi,
+  String reason,
+  String requestId,
+  String userId,
+) async {
+  final get = get_server_key();
+  String serverKey = await get.server_token();
+  final url = Uri.parse(
+    'https://fcm.googleapis.com/v1/projects/apps-d19d9/messages:send',
+  );
+  final response = await http.post(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $serverKey',
+    },
+    body: jsonEncode({
+      'message': {
+        'token': token,
+        'notification': {
+          'title': 'Solicitud de ingreso',
+          'body': '$visitorName solicita ingresar como $reason.',
+        },
+        'data': {
+          'visitorName': visitorName,
+          'visitorCi': visitorCi,
+          'reason': reason,
+          'requestId': requestId,
+          'senderId': userId,
+        },
+      },
+    }),
+  );
+
+  if (response.statusCode == 200) {
+    print('Notificación enviada correctamente');
+  } else {
+    print('Error al enviar notificación: ${response.body}');
   }
 }

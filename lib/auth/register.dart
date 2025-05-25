@@ -19,11 +19,13 @@ class _RegisterPage extends State<RegisterPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confpasswordController = TextEditingController();
+  final TextEditingController _ciController = TextEditingController();
+
   bool _isLoading = false;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  String? _selectedRol; // Nuevo campo para el dropdown
-  
+  String? _selectedRol; 
+
   void setupFCMTokenRefreshListener() {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       final user = FirebaseAuth.instance.currentUser;
@@ -60,13 +62,14 @@ class _RegisterPage extends State<RegisterPage> {
           .collection('users')
           .doc(userCredential.user!.uid)
           .set({
-            'nombre': _nameController.text.trim(),
-            'apellido': _lastnameController.text.trim(),
-            'telefono': _phoneController.text.trim(),
+            'name': _nameController.text.trim(),
+            'lastname': _lastnameController.text.trim(),
+            'phone': _phoneController.text.trim(),
             'email': _emailController.text.trim(),
             'rol': _selectedRol,
             'fcmToken': fcmToken, // Guardar token
             'createdAt': FieldValue.serverTimestamp(),
+            'ci': _ciController.text.trim(),
           });
 
       // ignore: use_build_context_synchronously
@@ -118,6 +121,13 @@ class _RegisterPage extends State<RegisterPage> {
                 'Apellido',
                 _lastnameController,
                 hintText: 'Ingresa tu apellido',
+                validator: _validateNotEmpty,
+              ),
+              const SizedBox(height: 20),
+              _buildTextField(
+                'Cédula',
+                _ciController,
+                hintText: 'Ingresa su Cédula',
                 validator: _validateNotEmpty,
               ),
               const SizedBox(height: 20),
@@ -236,6 +246,10 @@ class _RegisterPage extends State<RegisterPage> {
             DropdownMenuItem(
               value: 'representante',
               child: Text('Representante'),
+            ),
+            DropdownMenuItem(
+              value: 'visitante',
+              child: Text('Visitante'),
             ),
           ],
           onChanged: (value) {

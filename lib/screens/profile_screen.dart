@@ -1,4 +1,5 @@
 import 'package:app/auth/login_page.dart';
+import 'package:app/screens/generate_QR_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,6 +17,7 @@ class _ProfileScreen extends State<ProfileScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _rolController = TextEditingController();
+  final TextEditingController _ciController = TextEditingController();
 
   bool _isLoading = true;
 
@@ -38,11 +40,12 @@ class _ProfileScreen extends State<ProfileScreen> {
 
         if (userDoc.exists) {
           final data = userDoc.data()!;
-          _nameController.text = data['nombre'] ?? '';
-          _lastnameController.text = data['apellido'] ?? '';
+          _nameController.text = data['name'] ?? '';
+          _lastnameController.text = data['lastname'] ?? '';
           _emailController.text = data['email'] ?? '';
-          _phoneController.text = data['telefono'] ?? '';
+          _phoneController.text = data['phone'] ?? '';
           _rolController.text = data['rol'] ?? '';
+          _ciController.text = data['ci'] ?? '';
         }
       }
     } catch (e) {
@@ -62,6 +65,7 @@ class _ProfileScreen extends State<ProfileScreen> {
     'Email': false,
     'Teléfono': false,
     'Rol': false,
+    'CI': false,
   };
 
   @override
@@ -84,18 +88,30 @@ class _ProfileScreen extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 20),
                     const Icon(Icons.person, size: 80),
+                    Center(
+                      child:
+                          _rolController.text.toLowerCase() == 'residente' ||
+                                  _rolController.text.toLowerCase() ==
+                                      'admin' ||
+                                  _rolController.text.toLowerCase() ==
+                                      'visitante'
+                              ? _buildGenerateQRButton(context)
+                              : const SizedBox.shrink(),
+                    ),
                     const SizedBox(height: 20),
                     _buildTextField('Nombre', _nameController),
                     const SizedBox(height: 20),
                     _buildTextField('Apellido', _lastnameController),
                     const SizedBox(height: 20),
+                    _buildTextField('CI', _ciController),
+                    const SizedBox(height: 10),
                     _buildTextField('Email', _emailController),
                     const SizedBox(height: 20),
                     _buildTextField('Teléfono', _phoneController),
                     const SizedBox(height: 20),
                     _buildTextField('Rol', _rolController),
-                    const SizedBox(height: 40),
-                    _buildLogOutButton(context),
+                    const SizedBox(height: 10),
+                    Center(child: _buildLogOutButton(context)),
                   ],
                 ),
               ),
@@ -176,6 +192,36 @@ class _ProfileScreen extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildGenerateQRButton(BuildContext context) {
+    return SizedBox(
+      width: 150,
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => GenerateQRScreen(
+                    name: _nameController.text.trim(),
+                    lastname: _lastnameController.text.trim(),
+                    id: _ciController.text.trim(),
+                    type: _rolController.text.trim(),
+                    phone: _phoneController.text.trim(),
+                  ),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blueGrey,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: const Text('Generar QR', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
   String maskSensitiveData(String label, String value) {
     if (label == 'Teléfono' && value.length >= 4) {
       return value.replaceRange(2, value.length - 2, '*' * (value.length - 4));
@@ -192,6 +238,8 @@ class _ProfileScreen extends State<ProfileScreen> {
       }
     } else if (label == 'Rol' && value.isNotEmpty) {
       return value[0] + '*' * (value.length - 2) + value[value.length - 1];
+    } else if (label == 'CI' && value.isNotEmpty) {
+      return value.replaceRange(2, value.length - 2, '*' * (value.length - 4));
     }
     return value;
   }

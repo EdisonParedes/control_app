@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:app/screens/visitor_approval_screen.dart';
 import 'package:app/services/serverkey.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,7 @@ import 'package:app/screens/map_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:app/services/user_session.dart';
 import 'package:provider/provider.dart';
+import '../main.dart';
 
 class EmergencyButton extends StatefulWidget {
   @override
@@ -53,26 +55,57 @@ class _EmergencyButtonState extends State<EmergencyButton> {
 
     context.read<UserSession>().cargarDatosUsuario();
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      String senderId = message.data['senderId'] ?? '';
-      String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      final data = message.data;
+      
+
+      // Evitar mostrar la notificación si el usuario es quien la envió
+      String senderId = data['senderId'] ?? '';
+      String currentUserId = FirebaseMessaging.instance.getToken().toString();
       if (senderId == currentUserId) return;
 
-      double latitude = double.tryParse(message.data['latitude'] ?? '0') ?? 0;
-      double longitude = double.tryParse(message.data['longitude'] ?? '0') ?? 0;
+      if (data.containsKey('latitude') && data.containsKey('longitude')) {
+        double latitude = double.tryParse(data['latitude'] ?? '0') ?? 0;
+        double longitude = double.tryParse(data['longitude'] ?? '0') ?? 0;
 
-      if (latitude != 0 && longitude != 0) {
-        Navigator.push(
-          context,
+        if (latitude != 0 && longitude != 0) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder:
+                  (_) => MapScreen(latitude: latitude, longitude: longitude),
+            ),
+          );
+        }
+      } else if (data.containsKey('visitorName') &&
+          data.containsKey('visitorCi') &&
+          data.containsKey('reason') &&
+          data.containsKey('requestId')) {
+        String visitorName = data['visitorName'];
+        String visitorCi = data['visitorCi'];
+        String reason = data['reason'];
+        String requestId = data['requestId'];
+
+        navigatorKey.currentState?.push(
           MaterialPageRoute(
-            builder: (context) => MapScreen(latitude: latitude, longitude: longitude),
+            builder:
+                (_) => VisitorApprovalScreen(
+                  visitorName: visitorName,
+                  visitorCi: visitorCi,
+                  reason: reason,
+                  requestId: requestId,
+                ),
+          ),
+        );
+      } else {
+        // Notificación genérica
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              message.notification?.body ?? 'Notificación recibida',
+            ),
           ),
         );
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message.notification?.body ?? 'Sin título')),
-      );
     });
   }
 
@@ -97,7 +130,11 @@ class _EmergencyButtonState extends State<EmergencyButton> {
     String userName = 'Usuario';
     String userId = user!.uid;
 
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final userDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
     if (userDoc.exists) {
       final data = userDoc.data()!;
       userName = '${data['nombre'] ?? 'Usuario'} ${data['apellido'] ?? ''}';
@@ -208,27 +245,29 @@ class _EmergencyButtonState extends State<EmergencyButton> {
         width: 65,
         height: 65,
         decoration: BoxDecoration(
-          color: isCompleted
-              ? Colors.green
-              : (isSending ? Colors.orange : Colors.red),
+          color:
+              isCompleted
+                  ? Colors.green
+                  : (isSending ? Colors.orange : Colors.red),
           shape: BoxShape.circle,
           boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
         ),
         child: Center(
-          child: isSending
-              ? SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 3,
+          child:
+              isSending
+                  ? SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      strokeWidth: 3,
+                    ),
+                  )
+                  : Icon(
+                    isCompleted ? Icons.check : Icons.warning,
+                    color: Colors.white,
+                    size: 40,
                   ),
-                )
-              : Icon(
-                  isCompleted ? Icons.check : Icons.warning,
-                  color: Colors.white,
-                  size: 40,
-                ),
         ),
       ),
     );

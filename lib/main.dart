@@ -1,3 +1,4 @@
+import 'package:app/screens/approve_entry_QR_screen.dart';
 import 'package:app/screens/emergency_button.dart';
 import 'package:app/screens/home_page.dart';
 import 'package:app/services/location_permission_service.dart';
@@ -7,11 +8,11 @@ import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:app/services/my_firebase_messaging_service.dart';
 import 'package:provider/provider.dart';
-import 'package:app/services/user_session.dart'; 
+import 'package:app/services/user_session.dart';
 
 // Definir el GlobalKey para el navigator globalmente
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -40,7 +41,7 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const HomePage(), 
+      home: const HomePage(),
     );
   }
 }

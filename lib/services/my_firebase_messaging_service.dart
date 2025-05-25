@@ -1,6 +1,14 @@
+import 'package:app/screens/approve_entry_QR_screen.dart';
+import 'package:app/screens/visitor_approval_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:app/screens/map_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:app/services/serverkey.dart';
+import '../main.dart';
+
 
 class MyFirebaseMessagingService {
   static void setupFirebaseMessaging(BuildContext context) async {
@@ -22,27 +30,51 @@ class MyFirebaseMessagingService {
     // Escuchar cuando la app se abre desde una notificación (en segundo plano o cerrada)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('Notificación abierta: ${message.notification?.title}');
+      final data = message.data;
+      
 
+      // 🔵 Si vienen coordenadas, abrimos el mapa
+      if (data.containsKey('latitude') && data.containsKey('longitude')) {
+        double latitude = double.tryParse(data['latitude'] ?? '0') ?? 0;
+        double longitude = double.tryParse(data['longitude'] ?? '0') ?? 0;
 
-      // Acceder a los datos de la notificación
-      double latitude = double.tryParse(message.data['latitude'] ?? '0') ?? 0;
-      double longitude = double.tryParse(message.data['longitude'] ?? '0') ?? 0;
+        if (latitude != 0 && longitude != 0) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder:
+                  (context) =>
+                      MapScreen(latitude: latitude, longitude: longitude),
+            ),
+          );
+          return;
+        }
+      }
 
-      // Verifica si las coordenadas son válidas
-      if (latitude != 0 && longitude != 0) {
-        // Navegar a la pantalla del mapa con las coordenadas
-        Navigator.push(
-          context,
+      // 🟡 Si vienen datos de visitante, abrimos pantalla de aprobación
+      if (data.containsKey('visitorName') &&
+          data.containsKey('visitorCi') &&
+          data.containsKey('reason') &&
+          data.containsKey('requestId')) {
+        String visitorName = data['visitorName'];
+        String visitorCi = data['visitorCi'];
+        String reason = data['reason'];
+        String requestId = data['requestId'];
+
+        navigatorKey.currentState?.push(
           MaterialPageRoute(
             builder:
-                (context) =>
-                    MapScreen(latitude: latitude, longitude: longitude),
+                (context) => VisitorApprovalScreen(
+                  visitorName: visitorName,
+                  visitorCi: visitorCi,
+                  reason: reason,
+                  requestId: requestId,
+                ),
           ),
         );
-      } else {
-        // Si las coordenadas no son válidas, maneja el error o muestra un mensaje
-        print("No se recibieron coordenadas válidas");
+        return;
       }
+
+      print("No se recibieron datos válidos");
     });
 
     // Manejo de mensajes cuando la app está completamente cerrada
@@ -56,5 +88,33 @@ class MyFirebaseMessagingService {
     print('Notificación en segundo plano: ${message.messageId}');
     // Aquí puedes manejar la notificación de fondo.
     // Por ejemplo, enviar un `local notification` o actualizar algo en la app.
+  }
+
+  static Future<void> sendPushNotification({
+    required String token,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    final get = get_server_key();
+    String serverKey = await get.server_token();
+    try {
+      await http.post(
+        Uri.parse(
+          'https://fcm.googleapis.com/v1/projects/apps-d19d9/messages:send',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'key=$serverKey',
+        },
+        body: jsonEncode({
+          'to': token,
+          'notification': {'title': title, 'body': body},
+          'data': data ?? {},
+        }),
+      );
+    } catch (e) {
+      print('Error enviando la notificación: $e');
+    }
   }
 }

@@ -1,7 +1,8 @@
 import 'package:app/screens/new_news_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Asegúrate de importar Provider
-import 'package:app/services/user_session.dart'; // Asegúrate de importar UserSession
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:app/services/user_session.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -19,6 +20,12 @@ class _NewsScreenState extends State<NewsScreen> {
     _cargarDatosFuturo = context.read<UserSession>().cargarDatosUsuario();
   }
 
+  DateTime? _parseDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
@@ -28,33 +35,58 @@ class _NewsScreenState extends State<NewsScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        return ListView(
-          padding: const EdgeInsets.all(40),
+        return Column(
           children: [
-            Consumer<UserSession>(
-              builder: (context, userSession, child) {
-                // Verifica si el usuario tiene el rol necesario
-                if (userSession.esAdmin() || userSession.esRepresentante()) {
-                  return Positioned(
-                    top: 60,
-                    right: 20,
-                    child: _buildNewNewsButton(context),
+            if (context.read<UserSession>().esAdmin() ||
+                context.read<UserSession>().esRepresentante())
+              Padding(
+                padding: const EdgeInsets.only(top: 50),
+                child: _buildNewNewsButton(context),
+              ),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream:
+                    FirebaseFirestore.instance
+                        .collection('news')
+                        .orderBy('date', descending: true)
+                        .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Text('No hay noticias disponibles.'),
+                    );
+                  }
+
+                  final noticias = snapshot.data!.docs;
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(20),
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemCount: noticias.length,
+                    itemBuilder: (context, index) {
+                      final noticia =
+                          noticias[index].data() as Map<String, dynamic>;
+                      final title = noticia['title'] ?? '';
+                      final description = noticia['description'] ?? '';
+                      final source = noticia['source'] ?? '';
+                      final date = _parseDate(noticia['date']);
+
+                      return ListTile(
+                        leading: const Icon(Icons.info, color: Colors.blue),
+                        title: Text(title),
+                        subtitle: Text(
+                          '${_formatDate(date)} - Fuente: $source',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      );
+                    },
                   );
-                }
-                return const SizedBox(); // No muestra nada si no es autorizado
-              },
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.warning, color: Colors.red),
-              title: const Text('Robo en zona centro'),
-              subtitle: const Text('Hace 2 horas - Fuente: Policía'),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.info, color: Colors.blue),
-              title: const Text('Nueva cámara instalada'),
-              subtitle: const Text('Hace 1 día - Municipalidad'),
+                },
+              ),
             ),
           ],
         );
@@ -62,17 +94,29 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Fecha desconocida';
+    final duration = DateTime.now().difference(date);
+
+    if (duration.inMinutes < 60) {
+      return 'Hace ${duration.inMinutes} minutos';
+    } else if (duration.inHours < 24) {
+      return 'Hace ${duration.inHours} horas';
+    } else {
+      return 'Hace ${duration.inDays} días';
+    }
+  }
+
   Widget _buildNewNewsButton(BuildContext context) {
     return SizedBox(
-      width: 150,
+      width: 180,
       child: ElevatedButton(
-        onPressed:
-            () => {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => NewNewsScreen()),
-              ),
-            },
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const NewNewsScreen()),
+          );
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black,
           shape: RoundedRectangleBorder(

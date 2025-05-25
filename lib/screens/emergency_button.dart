@@ -58,10 +58,9 @@ class _EmergencyButtonState extends State<EmergencyButton> {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       final data = message.data;
       
-
       // Evitar mostrar la notificación si el usuario es quien la envió
       String senderId = data['senderId'] ?? '';
-      String currentUserId = FirebaseMessaging.instance.getToken().toString();
+      String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
       if (senderId == currentUserId) return;
 
       if (data.containsKey('latitude') && data.containsKey('longitude')) {

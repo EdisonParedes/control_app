@@ -88,16 +88,7 @@ class _ProfileScreen extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 20),
                     const Icon(Icons.person, size: 80),
-                    Center(
-                      child:
-                          _rolController.text.toLowerCase() == 'residente' ||
-                                  _rolController.text.toLowerCase() ==
-                                      'admin' ||
-                                  _rolController.text.toLowerCase() ==
-                                      'visitante'
-                              ? _buildGenerateQRButton(context)
-                              : const SizedBox.shrink(),
-                    ),
+                    Center(child: _buildGenerateQRButton(context)),
                     const SizedBox(height: 20),
                     _buildTextField('Nombre', _nameController),
                     const SizedBox(height: 20),

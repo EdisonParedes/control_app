@@ -31,6 +31,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   final TextEditingController _reasonController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   bool _isLoading = false;
+  bool _isExportingPdf = false;
 
   String _accessType = 'Ingreso';
   String _personType = 'Residente';
@@ -213,7 +214,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
       final doc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final userRole = doc.data()?['rol'];
-      return userRole == 'admin';
+      return userRole == 'admin' || userRole == 'representante';
     }
     return false;
   }
@@ -391,7 +392,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
 
   Widget _buildExportPdfButton() {
     return ElevatedButton.icon(
-      onPressed: _exportToPdf,
+      onPressed: _isExportingPdf ? null : _exportToPdfC,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.black,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -402,6 +403,25 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
         style: TextStyle(color: Colors.white70),
       ),
     );
+  }
+
+  Future<void> _exportToPdfC() async {
+    setState(() {
+      _isExportingPdf = true;
+    });
+
+    try {
+      // Tu lógica para generar y abrir el PDF aquí
+      await _exportToPdf(); // reemplaza por tu función real
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al exportar el PDF: $e')));
+    } finally {
+      setState(() {
+        _isExportingPdf = false;
+      });
+    }
   }
 
   Widget _buildExportExcelButton() {
@@ -465,9 +485,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
                     const SizedBox(width: 10),
                   ],
                 ),
-                const SizedBox(height: 16),
-                /* Center(child: _buildQrScanButton()),
-                const SizedBox(height: 16), */
+                const SizedBox(height: 10),
                 if (_accessType == 'Ingreso') ...[
                   Center(child: _buildQrScanButton()),
                   const SizedBox(height: 16),

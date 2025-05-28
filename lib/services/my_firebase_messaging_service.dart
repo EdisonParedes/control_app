@@ -43,7 +43,7 @@ class MyFirebaseMessagingService {
             MaterialPageRoute(
               builder:
                   (context) =>
-                      MapScreen(latitude: latitude, longitude: longitude),
+                      MapScreen(latitude: latitude, longitude: longitude, fromNotification: true,),
             ),
           );
           return;

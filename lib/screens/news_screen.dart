@@ -71,12 +71,12 @@ class _NewsScreenState extends State<NewsScreen> {
                       final noticia =
                           noticias[index].data() as Map<String, dynamic>;
                       final title = noticia['title'] ?? '';
-                      final description = noticia['description'] ?? '';
+                      //final description = noticia['description'] ?? '';
                       final source = noticia['source'] ?? '';
                       final date = _parseDate(noticia['date']);
 
                       return ListTile(
-                        leading: const Icon(Icons.info, color: Colors.blue),
+                        leading: _iconoConColor(noticia['type'] ?? ''),
                         title: Text(title),
                         subtitle: Text(
                           '${_formatDate(date)} - Fuente: $source',
@@ -129,5 +129,20 @@ class _NewsScreenState extends State<NewsScreen> {
         ),
       ),
     );
+  }
+}
+
+Icon _iconoConColor(String tipo) {
+  switch (tipo) {
+    case 'Emergencia':
+      return Icon(Icons.warning, color: Colors.red);
+    case 'Seguridad':
+      return Icon(Icons.security, color: Colors.blue);
+    case 'Evento':
+      return Icon(Icons.event, color: Colors.green);
+    case 'Comunidad':
+      return Icon(Icons.people, color: Colors.orange);
+    default:
+      return Icon(Icons.article, color: Colors.grey);
   }
 }

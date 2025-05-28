@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
-import 'package:app/screens/approve_entry_QR_screen.dart'; // Asegúrate de ajustar el path si es necesario
+import 'package:app/screens/approve_entry_QR_screen.dart'; 
 
 class ScanQRScreen extends StatefulWidget {
   const ScanQRScreen({super.key});

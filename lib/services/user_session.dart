@@ -22,10 +22,10 @@ class UserSession with ChangeNotifier {
 
       if (data != null) {
         userId = uid;
-        nombre = data['nombre'];
-        apellido = data['apellido'];
+        nombre = data['name'];
+        apellido = data['lastname'];
         email = data['email'];
-        telefono = data['telefono'];
+        telefono = data['phone'];
         rol = data['rol'];
         notifyListeners();  // Notifica a los consumidores que los datos han cambiado
       }
@@ -40,6 +40,8 @@ class UserSession with ChangeNotifier {
   bool esGuardia() => rol == 'guardia';
 
   bool esVisitante() => rol == 'visitante';
+
+  bool esResdente() => rol == 'residente';
 
   String nombreCompleto() => "${nombre ?? ''} ${apellido ?? ''}".trim();
 }

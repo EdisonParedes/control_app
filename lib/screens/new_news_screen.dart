@@ -1,7 +1,9 @@
+import 'package:app/screens/manager_type_news.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // Asegúrate de importar Provider
 import 'package:app/services/user_session.dart'; // Asegúrate de importar UserSession
+import 'package:app/services/firebase_service.dart';
 
 class NewNewsScreen extends StatefulWidget {
   const NewNewsScreen({super.key});
@@ -17,12 +19,17 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
   final _fuenteController = TextEditingController();
   late Future<void> _cargarDatosFuturo;
 
+  String? _tipoNoticiaSeleccionado;
+
+  List<String> _tiposNoticia = [];
+
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _cargarDatosFuturo = context.read<UserSession>().cargarDatosUsuario();
+    _obtenerListaTipoNoticias();
   }
 
   Future<void> _guardarNoticia() async {
@@ -38,6 +45,7 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
         'title': _tituloController.text.trim(),
         'description': _descripcionController.text.trim(),
         'source': _fuenteController.text.trim(),
+        'type': _tipoNoticiaSeleccionado,
         'date': FieldValue.serverTimestamp(),
         'userId': context.read<UserSession>().userId,
       });
@@ -111,6 +119,34 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
     );
   }
 
+  void _obtenerListaTipoNoticias() async {
+    final tipoNoticias = await FirebaseService.obtenerTipoNoticias();
+    setState(() {
+      _tiposNoticia = tipoNoticias;
+    });
+  }
+
+  void _crudTypeNews() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ManagerTypeNews(
+              onActualizar: () async {
+                final tiposNoticiaActualizado =
+                    await FirebaseService.obtenerMotivosVisita();
+                setState(() => _tiposNoticia = tiposNoticiaActualizado);
+              },
+            ),
+          ),
+    );
+  }
+
   @override
   void dispose() {
     _tituloController.dispose();
@@ -155,6 +191,47 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
                     (value) => value!.isEmpty ? 'Ingrese una fuente' : null,
               ),
               const SizedBox(height: 30),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _tipoNoticiaSeleccionado,
+                      items:
+                          _tiposNoticia
+                              .map(
+                                (tipo) => DropdownMenuItem(
+                                  value: tipo,
+                                  child: Text(tipo),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _tipoNoticiaSeleccionado = value;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Tipo de noticia',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      validator:
+                          (value) =>
+                              value == null
+                                  ? 'Seleccione un tipo de noticia'
+                                  : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    onPressed: _crudTypeNews,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
               _buildSubmitButton('Guardar Noticia', _guardarNoticia),
             ],
           ),

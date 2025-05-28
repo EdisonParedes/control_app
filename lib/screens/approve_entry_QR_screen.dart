@@ -1,4 +1,5 @@
 import 'package:app/screens/entry_exit_screen.dart';
+import 'package:app/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app/services/my_firebase_messaging_service.dart';
@@ -6,6 +7,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:app/screens/visitor_approval_screen.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:app/services/firebase_service.dart';
+import 'package:provider/provider.dart';
 
 class ApproveEntryScreen extends StatefulWidget {
   final String name;
@@ -35,16 +38,12 @@ class _ApproveEntryScreenState extends State<ApproveEntryScreen> {
 
   String? _selectedReason;
 
-  final List<String> _motivosVisita = [
-    'Familiar',
-    'Amigo',
-    'Entrega',
-    'Servicio',
-    'Otro',
-  ];
+  List<String> _motivosVisita = [];
+
   @override
   void initState() {
     super.initState();
+    _cargarMotivosVisita();
   }
 
   @override
@@ -52,6 +51,13 @@ class _ApproveEntryScreenState extends State<ApproveEntryScreen> {
     _plateController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  void _cargarMotivosVisita() async {
+    final motivos = await FirebaseService.obtenerMotivosVisita();
+    setState(() {
+      _motivosVisita = motivos;
+    });
   }
 
   Widget _buildTextField(
@@ -207,7 +213,7 @@ class _ApproveEntryScreenState extends State<ApproveEntryScreen> {
     _phoneController.clear();
     setState(() => _selectedReason = null);
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(

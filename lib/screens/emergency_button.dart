@@ -71,7 +71,7 @@ class _EmergencyButtonState extends State<EmergencyButton> {
           navigatorKey.currentState?.push(
             MaterialPageRoute(
               builder:
-                  (_) => MapScreen(latitude: latitude, longitude: longitude),
+                  (_) => MapScreen(latitude: latitude, longitude: longitude, fromNotification: true,),
             ),
           );
         }

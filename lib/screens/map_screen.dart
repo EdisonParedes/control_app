@@ -1,106 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 class MapScreen extends StatefulWidget {
   final double latitude;
   final double longitude;
+  final bool fromNotification; // Nueva variable para diferenciar
 
-  // Constructor para recibir las coordenadas
-  MapScreen({required this.latitude, required this.longitude});
+  const MapScreen({
+    super.key,
+    required this.latitude,
+    required this.longitude,
+    this.fromNotification = false, // Si no se pasa, será falso
+  });
 
   @override
-  _MapScreenState createState() => _MapScreenState();
+  State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final double? latitude = 0;
-  final double? longitude = 0;
-  final String mapboxAccessToken =
-      "pk.eyJ1IjoiZWRpc29uMDkiLCJhIjoiY204bmtoc3U2MDFsaDJscHdybmVpNGN0MiJ9.aQLrHV8J2vAp8at0jCbrQg"; // Reemplaza con tu clave de Mapbox
-
-  late LatLng
-  currentPosition; // Usamos 'late' porque las coordenadas se pasan en el constructor
-
-  final MapController _mapController = MapController();
-  String selectedMapStyle = 'satellite-v9'; // Estilo de mapa por defecto
-
-  final Map<String, String> mapStyles = {
+  final String _mapboxAccessToken =
+      "pk.eyJ1IjoiZWRpc29uMDkiLCJhIjoiY204bmtoc3U2MDFsaDJscHdybmVpNGN0MiJ9.aQLrHV8J2vAp8at0jCbrQg";
+  final Map<String, String> _mapStyles = {
     'Calles': 'streets-v12',
     'Satélite': 'satellite-v9',
   };
 
+  String _selectedMapStyle = 'satellite-v9';
+  late MapController _mapController;
+
+  LatLng? _currentPosition;
+  late LatLng _destinationPosition;
+
   @override
   void initState() {
     super.initState();
-    // Usamos las coordenadas pasadas al constructor
-    currentPosition = LatLng(widget.latitude, widget.longitude);
+    _mapController = MapController();
+    _destinationPosition = LatLng(widget.latitude, widget.longitude);
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
+    });
   }
 
   void _centerMap() {
-    _mapController.move(currentPosition, 15);
+    if (_currentPosition != null) {
+      _mapController.move(_currentPosition!, 15);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
+        title: const Text('Mapa de Seguridad'),
         centerTitle: true,
-        title: const Text(
-          'Mapa de Seguridad',
-          style: TextStyle(color: Colors.white),
-        ),
         backgroundColor: Colors.black,
         actions: [
           DropdownButton<String>(
-            value: selectedMapStyle,
+            value: _selectedMapStyle,
             dropdownColor: Colors.black,
-            onChanged: (String? newValue) {
-              setState(() {
-                selectedMapStyle = newValue!;
-              });
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedMapStyle = value);
+              }
             },
             items:
-                mapStyles.entries
-                    .map<DropdownMenuItem<String>>(
-                      (entry) => DropdownMenuItem(
-                        value: entry.value,
-                        child: Text(
-                          entry.key,
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    )
-                    .toList(),
+                _mapStyles.entries.map((entry) {
+                  return DropdownMenuItem<String>(
+                    value: entry.value,
+                    child: Text(
+                      entry.key,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  );
+                }).toList(),
           ),
         ],
       ),
       body:
-          currentPosition == null
+          _currentPosition == null
               ? const Center(child: CircularProgressIndicator())
               : FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: currentPosition,
+                  initialCenter: _currentPosition!,
+                  initialZoom: 15,
                   minZoom: 5,
                   maxZoom: 25,
-                  initialZoom: 15,
                 ),
                 children: [
                   TileLayer(
                     urlTemplate:
                         'https://api.mapbox.com/styles/v1/mapbox/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}',
                     additionalOptions: {
-                      'accessToken': mapboxAccessToken,
-                      'id': selectedMapStyle,
+                      'accessToken': _mapboxAccessToken,
+                      'id': _selectedMapStyle,
                     },
                   ),
                   MarkerLayer(
                     markers: [
                       Marker(
-                        point: currentPosition,
+                        point: _currentPosition!,
                         width: 150,
                         height: 50,
                         child: Column(
@@ -109,40 +118,67 @@ class _MapScreenState extends State<MapScreen> {
                               'Usted está aquí',
                               style: TextStyle(
                                 color:
-                                    selectedMapStyle == 'streets-v12'
+                                    _selectedMapStyle == 'streets-v12'
                                         ? Colors.black
-                                        : Colors
-                                            .white, // Cambiar el color según el mapa
+                                        : Colors.white,
                                 fontSize: 10,
                               ),
                             ),
                             Icon(
-                              Icons.person_3,
+                              Icons.person_pin_circle,
                               color:
-                                  selectedMapStyle == 'streets-v12'
+                                  _selectedMapStyle == 'streets-v12'
                                       ? Colors.black
                                       : Colors.white,
-                              size: 12,
+                              size: 16,
                             ),
                           ],
                         ),
                       ),
+                      // Mostrar el marcador de destino solo si se abre desde la notificación
+                      if (widget.fromNotification)
+                        Marker(
+                          point: _destinationPosition,
+                          width: 150,
+                          height: 50,
+                          child: Column(
+                            children: const [
+                              Text(
+                                'Destino',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              Icon(
+                                Icons.location_on,
+                                color: Colors.red,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
+                  // Solo mostrar la ruta si se abre desde la notificación
+                  if (widget.fromNotification && _currentPosition != null)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: [_currentPosition!, _destinationPosition],
+                          strokeWidth: 4,
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ),
                 ],
               ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 80.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FloatingActionButton(
-              onPressed: _centerMap,
-              child: const Icon(Icons.my_location),
-            ),
-          ],
+        child: FloatingActionButton(
+          onPressed: _centerMap,
+          tooltip: 'Centrar mapa',
+          child: const Icon(Icons.my_location),
         ),
       ),
     );

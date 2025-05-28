@@ -1,4 +1,7 @@
 import 'package:app/screens/ExcelPreviewScreen.dart';
+import 'package:app/screens/manager_visit_reasons.dart';
+import 'package:app/services/firebase_service.dart';
+import 'package:app/services/user_session.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -13,6 +16,7 @@ import 'dart:async';
 import 'package:app/services/serverkey.dart';
 import 'package:app/screens/scan_QR_screen.dart';
 import 'package:app/screens/visitor_approval_screen.dart';
+import 'package:provider/provider.dart';
 
 class EntryExitScreen extends StatefulWidget {
   const EntryExitScreen({super.key});
@@ -32,24 +36,21 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   final TextEditingController _phoneController = TextEditingController();
   bool _isLoading = false;
   bool _isExportingPdf = false;
+  List<String> tiposAcceso = ['Ingreso', 'Salida'];
 
   String _accessType = 'Ingreso';
   String _personType = 'Residente';
   String? _selectedReason;
-  final List<String> _motivosVisita = [
-    'Entrega',
-    'Reunión',
-    'Servicio Técnico',
-    'Visita Familiar',
-    'Otro',
-  ];
+  late List<String> _motivosVisita = [];
 
   @override
   void initState() {
     super.initState();
+    _cargarMotivosVisita();
   }
 
   Future<void> _registerAccess() async {
+    final session = context.read<UserSession>();
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -72,7 +73,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
         return;
       }
 
-      if (_personType == 'Visitante') {
+      if (session.esVisitante()) {
         if (_selectedReason == null || _selectedReason!.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Debe seleccionar un motivo de visita.')),
@@ -209,12 +210,10 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   }
 
   Future<bool> isAuthorizedUser() async {
+    final session = context.read<UserSession>();
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      final userRole = doc.data()?['rol'];
-      return userRole == 'admin' || userRole == 'representante';
+      return session.esAdmin() || session.esRepresentante();
     }
     return false;
   }
@@ -271,9 +270,15 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   }
 
   Future<List<Map<String, dynamic>>> obtenerDatosDeAccesos() async {
+    final now = DateTime.now();
+    final inicioDelDia = DateTime(now.year, now.month, now.day);
+    final finDelDia = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
     final snapshot =
         await FirebaseFirestore.instance
             .collection('access')
+            .where('timestamp', isGreaterThanOrEqualTo: inicioDelDia)
+            .where('timestamp', isLessThanOrEqualTo: finDelDia)
             .orderBy('timestamp', descending: true)
             .get();
 
@@ -439,194 +444,278 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     );
   }
 
+  void _abrirCrudMotivos() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ManagerVisitReasons(
+              onActualizar: () async {
+                final motivosActualizados =
+                    await FirebaseService.obtenerMotivosVisita();
+                setState(() => _motivosVisita = motivosActualizados);
+              },
+            ),
+          ),
+    );
+  }
+
+  void _cargarMotivosVisita() async {
+    final motivos = await FirebaseService.obtenerMotivosVisita();
+    setState(() {
+      _motivosVisita = motivos;
+    });
+  }
+
+  @override
   @override
   Widget build(BuildContext context) {
+    final session = context.read<UserSession>();
+
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 30),
-                Center(
-                  child: Text(
-                    'Control de Ingreso y Salida',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Text(
-                      'Tipo de acceso:',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 10),
-                    DropdownButton<String>(
-                      value: _accessType,
-                      items:
-                          ['Ingreso', 'Salida']
-                              .map(
-                                (tipo) => DropdownMenuItem(
-                                  value: tipo,
-                                  child: Text(tipo),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _accessType = value!;
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (_accessType == 'Ingreso') ...[
-                  Center(child: _buildQrScanButton()),
-                  const SizedBox(height: 16),
-                  Row(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _buildTextField(
-                          'Nombre',
-                          _nameController,
-                          validator:
-                              (v) => v!.isEmpty ? 'Campo requerido' : null,
+                      // Título
+                      const SizedBox(height: 30),
+                      const Center(
+                        child: Text(
+                          'Control de Ingreso y Salida',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildTextField(
-                          'Apellido',
-                          _lastnameController,
-                          validator:
-                              (v) => v!.isEmpty ? 'Campo requerido' : null,
+
+                      const SizedBox(height: 20),
+
+                      // Tipo de acceso
+                      Row(
+                        children: [
+                          const Text(
+                            'Tipo de acceso:',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 10),
+                          DropdownButton<String>(
+                            value: _accessType,
+                            items:
+                                tiposAcceso
+                                    .map(
+                                      (tipo) => DropdownMenuItem(
+                                        value: tipo,
+                                        child: Text(tipo),
+                                      ),
+                                    )
+                                    .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _accessType = value!;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Datos solo para ingreso
+                      if (_accessType == 'Ingreso') ...[
+                        Center(child: _buildQrScanButton()),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                'Nombre',
+                                _nameController,
+                                validator:
+                                    (v) =>
+                                        v!.isEmpty ? 'Campo requerido' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _buildTextField(
+                                'Apellido',
+                                _lastnameController,
+                                validator:
+                                    (v) =>
+                                        v!.isEmpty ? 'Campo requerido' : null,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Cédula
+                      _buildTextField(
+                        'Cédula',
+                        _idController,
+                        validator: validateCedulaEcuatoriana,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                _buildTextField(
-                  'Cédula',
-                  _idController,
-                  validator: validateCedulaEcuatoriana,
-                ),
-                const SizedBox(height: 16),
-                if (_accessType == 'Ingreso') ...[
-                  Row(
-                    children: [
-                      const Text(
-                        'Tipo de persona:',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      DropdownButton<String>(
-                        value: _personType,
-                        items:
-                            ['Residente', 'Visitante']
-                                .map(
-                                  (tipo) => DropdownMenuItem(
-                                    value: tipo,
-                                    child: Text(tipo),
+
+                      const SizedBox(height: 16),
+
+                      // Datos adicionales solo para ingreso
+                      if (_accessType == 'Ingreso') ...[
+                        // Tipo de persona
+                        Row(
+                          children: [
+                            const Text(
+                              'Tipo de persona:',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            DropdownButton<String>(
+                              value: _personType,
+                              items:
+                                  ['Residente', 'Visitante']
+                                      .map(
+                                        (tipo) => DropdownMenuItem(
+                                          value: tipo,
+                                          child: Text(tipo),
+                                        ),
+                                      )
+                                      .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _personType = value!;
+                                  _selectedReason = null;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        _buildTextField(
+                          'Placa del vehículo (opcional)',
+                          _plateController,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Motivo de visita y teléfono del residente (solo si es visitante)
+                        if (_personType == 'Visitante') ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _selectedReason,
+                                  decoration: InputDecoration(
+                                    labelText: 'Motivo de la visita',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
-                                )
-                                .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _personType = value!;
-                            _selectedReason = null;
-                          });
+                                  items:
+                                      _motivosVisita
+                                          .map(
+                                            (motivo) => DropdownMenuItem(
+                                              value: motivo,
+                                              child: Text(motivo),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedReason = value;
+                                    });
+                                  },
+                                  validator: (value) {
+                                    if (session.esVisitante() &&
+                                        (value == null || value.isEmpty)) {
+                                      return 'Debe seleccionar un motivo';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              if (session.esRepresentante() ||
+                                  session.esGuardia())
+                                IconButton(
+                                  icon: const Icon(Icons.settings),
+                                  onPressed: _abrirCrudMotivos,
+                                ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          _buildTextField(
+                            'Teléfono del residente',
+                            _phoneController,
+                            validator: (v) {
+                              if (_personType == 'Visitante') {
+                                if (v == null || v.trim().isEmpty)
+                                  return 'Campo requerido';
+                                if (!RegExp(r'^\d{10}$').hasMatch(v))
+                                  return 'Número inválido';
+                              }
+                              return null;
+                            },
+                          ),
+
+                          const SizedBox(height: 16),
+                        ],
+                      ],
+
+                      // Botón registrar
+                      Center(child: _buildRegisterButton()),
+
+                      const SizedBox(height: 10),
+
+                      // Botones de exportar (solo usuarios autorizados)
+                      FutureBuilder<bool>(
+                        future: isAuthorizedUser(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (snapshot.hasData &&
+                              snapshot.data == true) {
+                            return Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildExportPdfButton(),
+                                  const SizedBox(width: 5),
+                                  _buildExportExcelButton(),
+                                ],
+                              ),
+                            );
+                          } else {
+                            return const SizedBox();
+                          }
                         },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    'Placa del vehículo (opcional)',
-                    _plateController,
-                  ),
-                  const SizedBox(height: 16),
-                  if (_personType == 'Visitante') ...[
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _selectedReason,
-                      decoration: InputDecoration(
-                        labelText: 'Motivo de la visita',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      items:
-                          _motivosVisita
-                              .map(
-                                (motivo) => DropdownMenuItem(
-                                  value: motivo,
-                                  child: Text(motivo),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedReason = value;
-                        });
-                      },
-                      validator: (value) {
-                        if (_personType == 'Visitante' &&
-                            (value == null || value.isEmpty)) {
-                          return 'Debe seleccionar un motivo';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      'Teléfono del residente',
-                      _phoneController,
-                      validator: (v) {
-                        if (_personType == 'Visitante') {
-                          if (v == null || v.trim().isEmpty)
-                            return 'Campo requerido';
-                          if (!RegExp(r'^\d{10}$').hasMatch(v))
-                            return 'Número inválido';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ],
-                Center(child: _buildRegisterButton()),
-                const SizedBox(height: 10),
-                FutureBuilder<bool>(
-                  future: isAuthorizedUser(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasData && snapshot.data == true) {
-                      return Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildExportPdfButton(),
-                            const SizedBox(width: 5),
-                            _buildExportExcelButton(),
-                          ],
-                        ),
-                      );
-                    } else {
-                      return const SizedBox();
-                    }
-                  },
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

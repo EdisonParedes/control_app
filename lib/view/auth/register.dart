@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:app/auth/login_page.dart';
+import 'package:app/view/auth/login_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -24,7 +24,7 @@ class _RegisterPage extends State<RegisterPage> {
   bool _isLoading = false;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  String? _selectedRol; 
+  String? _selectedRol;
 
   void setupFCMTokenRefreshListener() {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
@@ -97,6 +97,7 @@ class _RegisterPage extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(40.0),
         child: Form(
@@ -166,8 +167,6 @@ class _RegisterPage extends State<RegisterPage> {
               _isLoading
                   ? const CircularProgressIndicator()
                   : _buildRegisterButton(),
-              const SizedBox(height: 20),
-              _buildRegisterPageRedirect(),
             ],
           ),
         ),
@@ -247,10 +246,6 @@ class _RegisterPage extends State<RegisterPage> {
               value: 'representante',
               child: Text('Representante'),
             ),
-            DropdownMenuItem(
-              value: 'visitante',
-              child: Text('Visitante'),
-            ),
           ],
           onChanged: (value) {
             setState(() {
@@ -274,31 +269,8 @@ class _RegisterPage extends State<RegisterPage> {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: const Text(
-          'Registrarse',
-          style: TextStyle(color: Colors.white70),
-        ),
+        child: const Text('Registrar', style: TextStyle(color: Colors.white70)),
       ),
-    );
-  }
-
-  Widget _buildRegisterPageRedirect() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text('¿Ya tienes cuenta? '),
-        GestureDetector(
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-              ),
-          child: const Text(
-            'Inicia sesión',
-            style: TextStyle(decoration: TextDecoration.underline),
-          ),
-        ),
-      ],
     );
   }
 }

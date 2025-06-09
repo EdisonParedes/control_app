@@ -1,4 +1,4 @@
-import 'package:app/screens/ExcelPreviewScreen.dart';
+import 'package:app/view/export/ExcelPreviewScreen.dart';
 import 'package:app/screens/manager_visit_reasons.dart';
 import 'package:app/services/firebase_service.dart';
 import 'package:app/services/user_session.dart';
@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:app/screens/pdf_Generation.dart';
+import 'package:app/view/export/pdf_Generation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:app/services/my_firebase_messaging_service.dart';
@@ -14,8 +14,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:app/services/serverkey.dart';
-import 'package:app/screens/scan_QR_screen.dart';
-import 'package:app/screens/visitor_approval_screen.dart';
+import 'package:app/view/qr/scan_QR_screen.dart';
+import 'package:app/view/entry_exit/visitor_approval_screen.dart';
 import 'package:provider/provider.dart';
 
 class EntryExitScreen extends StatefulWidget {
@@ -457,7 +457,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
             child: ManagerVisitReasons(
               onActualizar: () async {
                 final motivosActualizados =
-                    await FirebaseService.obtenerMotivosVisita();
+                    await FirebaseService.getVisitReasons();
                 setState(() => _motivosVisita = motivosActualizados);
               },
             ),
@@ -466,7 +466,7 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   }
 
   void _cargarMotivosVisita() async {
-    final motivos = await FirebaseService.obtenerMotivosVisita();
+    final motivos = await FirebaseService.getVisitReasons();
     setState(() {
       _motivosVisita = motivos;
     });

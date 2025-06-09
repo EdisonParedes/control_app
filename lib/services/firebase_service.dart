@@ -1,25 +1,50 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FirebaseService {
-  static Future<List<String>> obtenerMotivosVisita() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('reason_visit').get();
+  /// Fetches all visit reasons from Firestore.
+  static Future<List<String>> getVisitReasons() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('reason_visit').get();
 
-    return snapshot.docs.map((doc) => doc['name'] as String).toList();
+      return snapshot.docs.map((doc) => doc['name'] as String).toList();
+    } catch (e) {
+      print('Error fetching visit reasons: $e');
+      return [];
+    }
   }
 
-  static Future<List<String>> obtenerRoles() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('roles').get();
+  /// Fetches all roles from Firestore.
+  static Future<List<String>> getRoles() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('roles').get();
 
-    return snapshot.docs.map((doc) => doc['name'] as String).toList();
+      return snapshot.docs.map((doc) => doc['name'] as String).toList();
+    } catch (e) {
+      print('Error fetching roles: $e');
+      return [];
+    }
   }
 
-  static Future<List<String>> obtenerTipoNoticias() async {
+  /// Fetches all news types from Firestore.
+  static Future<List<String>> getNewsTypes() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('news_types').get();
+
+      return snapshot.docs.map((doc) => doc['name'] as String).toList();
+    } catch (e) {
+      print('Error fetching news types: $e');
+      return [];
+    }
+  }
+
+  /// Fetches all news types from Firestore.
+  static Future<List<String>> getStatus() async {
     final snapshot =
-        await FirebaseFirestore.instance.collection('news_types').get();
+        await FirebaseFirestore.instance.collection('status').get();
 
     return snapshot.docs.map((doc) => doc['name'] as String).toList();
   }
 }
-

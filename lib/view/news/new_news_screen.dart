@@ -120,7 +120,7 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
   }
 
   void _obtenerListaTipoNoticias() async {
-    final tipoNoticias = await FirebaseService.obtenerTipoNoticias();
+    final tipoNoticias = await FirebaseService.getNewsTypes();
     setState(() {
       _tiposNoticia = tipoNoticias;
     });
@@ -139,7 +139,7 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
             child: ManagerTypeNews(
               onActualizar: () async {
                 final tiposNoticiaActualizado =
-                    await FirebaseService.obtenerMotivosVisita();
+                    await FirebaseService.getVisitReasons();
                 setState(() => _tiposNoticia = tiposNoticiaActualizado);
               },
             ),

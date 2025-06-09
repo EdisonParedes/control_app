@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:app/screens/home_page.dart';
-import 'package:app/auth/register.dart';
+import 'package:app/view/dashboard/home_page.dart';
+import 'package:app/view/auth/register.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -134,27 +134,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildRegisterRedirect() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text('¿No tienes cuenta? '),
-        GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RegisterPage()),
-            );
-          },
-          child: const Text(
-            'Regístrate',
-            style: TextStyle(decoration: TextDecoration.underline),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -189,8 +168,6 @@ class _LoginPageState extends State<LoginPage> {
               _isLoading
                   ? const CircularProgressIndicator()
                   : _buildLoginButton(),
-              const SizedBox(height: 20),
-              _buildRegisterRedirect(),
             ],
           ),
         ),

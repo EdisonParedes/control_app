@@ -1,4 +1,4 @@
-import 'package:app/screens/new_news_screen.dart';
+import 'package:app/view/news/new_news_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

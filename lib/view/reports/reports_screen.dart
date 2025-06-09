@@ -1,5 +1,5 @@
-import 'package:app/auth/login_page.dart';
-import 'package:app/screens/new_report_page.dart';
+import 'package:app/view/auth/login_page.dart';
+import 'package:app/view/reports/new_report_page.dart';
 import 'package:flutter/material.dart';
 
 class ReportsScreen extends StatefulWidget {

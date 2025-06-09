@@ -1,14 +1,15 @@
-import 'package:app/screens/map_screen.dart';
-import 'package:app/screens/news_screen.dart';
-import 'package:app/screens/reports_screen.dart';
-import 'package:app/screens/entry_exit_screen.dart';
-import 'package:app/screens/new_report_page.dart';
+import 'package:app/view/map/map_screen.dart';
+import 'package:app/view/news/news_screen.dart';
+import 'package:app/view/reports/reports_screen.dart';
+import 'package:app/view/entry_exit/entry_exit_screen.dart';
+import 'package:app/view/reports/new_report_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'profile_screen.dart';
-import 'emergency_button.dart';
+import '../emergency/emergency_button.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:app/view/auth/register.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -154,7 +155,27 @@ class _HomePageState extends State<HomePage> {
         unselectedItemColor: Colors.grey,
         items: navigationItems,
       ),
-      floatingActionButton: EmergencyButton(),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_userRole == 'representante' || _userRole == 'guardia') ...[
+            FloatingActionButton(
+              heroTag: 'registerUser',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                );
+              },
+              backgroundColor: Colors.black,
+              child: const Icon(Icons.person_add),
+              tooltip: 'Registrar usuario',
+            ),
+            const SizedBox(height: 10),
+          ],
+          EmergencyButton(),
+        ],
+      ),
     );
   }
 }

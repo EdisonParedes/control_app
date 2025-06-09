@@ -1,11 +1,12 @@
-import 'package:app/screens/approve_entry_QR_screen.dart';
-import 'package:app/screens/emergency_button.dart';
-import 'package:app/screens/home_page.dart';
+import 'package:app/view/qr/approve_entry_QR_screen.dart';
+import 'package:app/view/emergency/emergency_button.dart';
+import 'package:app/view/dashboard/home_page.dart';
 import 'package:app/services/location_permission_service.dart';
 import 'package:flutter/material.dart';
-import 'auth/login_page.dart';
+import 'view/auth/login_page.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:app/services/my_firebase_messaging_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app/services/user_session.dart';
@@ -26,9 +27,10 @@ void main() async {
   );
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    MyFirebaseMessagingService.setupFirebaseMessaging(
-      navigatorKey.currentContext!,
-    );
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      MyFirebaseMessagingService.setupFirebaseMessaging(context);
+    }
   });
 }
 
@@ -41,7 +43,20 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const LoginPage(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          } else if (snapshot.hasData) {
+            return const HomePage(); // Usuario autenticado
+          } else {
+            return const LoginPage(); // Usuario no autenticado
+          }
+        },
+      ),
     );
   }
 }

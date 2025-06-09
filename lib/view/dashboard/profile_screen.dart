@@ -1,5 +1,5 @@
-import 'package:app/auth/login_page.dart';
-import 'package:app/screens/generate_QR_screen.dart';
+import 'package:app/view/auth/login_page.dart';
+import 'package:app/view/qr/generate_QR_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -68,6 +68,12 @@ class _ProfileScreen extends State<ProfileScreen> {
     'CI': false,
   };
 
+  Map<String, bool> _editFields = {
+    'Nombre': false,
+    'Apellido': false,
+    'Teléfono': false,
+  };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,7 +108,15 @@ class _ProfileScreen extends State<ProfileScreen> {
                     const SizedBox(height: 20),
                     _buildTextField('Rol', _rolController),
                     const SizedBox(height: 10),
-                    Center(child: _buildLogOutButton(context)),
+                    Center(
+                      child: Column(
+                        children: [
+                          _buildSaveButton(),
+                          const SizedBox(height: 10),
+                          _buildLogOutButton(context),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -110,19 +124,23 @@ class _ProfileScreen extends State<ProfileScreen> {
   }
 
   Widget _buildTextField(String label, TextEditingController controller) {
+    bool isEditable = _editFields.containsKey(label);
+    bool isEditing = _editFields[label] ?? false;
+    bool isVisible = _showFields[label] ?? false;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 5),
         TextField(
-          controller: TextEditingController(
-            text:
-                _showFields[label]!
-                    ? controller.text
-                    : maskSensitiveData(label, controller.text),
-          ),
-          readOnly: true,
+          controller:
+              isVisible || isEditing
+                  ? controller
+                  : TextEditingController(
+                    text: maskSensitiveData(label, controller.text),
+                  ),
+          readOnly: !(isEditing),
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(
               vertical: 8.0,
@@ -140,16 +158,36 @@ class _ProfileScreen extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Colors.black, width: 1.5),
             ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _showFields[label]! ? Icons.visibility_off : Icons.visibility,
-                color: Colors.black45,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showFields[label] = !_showFields[label]!;
-                });
-              },
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isEditable)
+                  IconButton(
+                    icon: Icon(
+                      isEditing ? Icons.cancel : Icons.edit,
+                      color: Colors.black45,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _editFields[label] = !isEditing;
+                        if (!isEditing) {
+                          _showFields[label] = true; // mostrar al editar
+                        }
+                      });
+                    },
+                  ),
+                IconButton(
+                  icon: Icon(
+                    isVisible ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.black45,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showFields[label] = !isVisible;
+                    });
+                  },
+                ),
+              ],
             ),
           ),
         ),
@@ -209,6 +247,49 @@ class _ProfileScreen extends State<ProfileScreen> {
           ),
         ),
         child: const Text('Generar QR', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: 150,
+      child: ElevatedButton(
+        onPressed: () async {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            try {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .update({
+                    'name': _nameController.text.trim(),
+                    'lastname': _lastnameController.text.trim(),
+                    'phone': _phoneController.text.trim(),
+                  });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Datos actualizados correctamente'),
+                ),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error al actualizar: $e')),
+              );
+            }
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: const Text(
+          'Guardar',
+          style: TextStyle(color: Colors.white70),
+        ),
       ),
     );
   }

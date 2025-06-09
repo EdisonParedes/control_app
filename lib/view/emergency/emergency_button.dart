@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:app/screens/visitor_approval_screen.dart';
+import 'package:app/view/entry_exit/visitor_approval_screen.dart';
 import 'package:app/services/serverkey.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,11 +10,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:app/services/location_permission_service.dart';
-import 'package:app/screens/map_screen.dart';
+import 'package:app/view/map/map_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:app/services/user_session.dart';
 import 'package:provider/provider.dart';
-import '../main.dart';
+import '../../main.dart';
 
 class EmergencyButton extends StatefulWidget {
   @override

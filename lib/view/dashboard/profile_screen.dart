@@ -1,5 +1,5 @@
 import 'package:app/view/auth/login_page.dart';
-import 'package:app/view/qr/generate_QR_screen.dart';
+import 'package:app/view/qr/generate_qr_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

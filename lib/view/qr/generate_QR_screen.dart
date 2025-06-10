@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'dart:convert';
+import 'package:app/models/visitor_qr_model.dart';
+import 'package:app/controllers/qr_controller.dart';
 
 class GenerateQRScreen extends StatelessWidget {
   final String name;
@@ -20,21 +21,22 @@ class GenerateQRScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Map<String, String> qrData = {
-      'name': name,
-      'lastname': lastname,
-      'id': id,
-      'type': type,
-      'phone': phone
-    };
-
-    final String jsonData = jsonEncode(qrData);
+    final controller = QRController();
+    final qrData = controller.generateQRData(
+      VisitorQR(
+        name: name,
+        lastname: lastname,
+        id: id,
+        type: type,
+        phone: phone,
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Código QR')),
       body: Center(
         child: QrImageView(
-          data: jsonData,
+          data: qrData,
           version: QrVersions.auto,
           size: 250.0,
         ),
@@ -42,4 +44,3 @@ class GenerateQRScreen extends StatelessWidget {
     );
   }
 }
-

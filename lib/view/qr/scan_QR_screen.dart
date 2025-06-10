@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
-import 'package:app/view/qr/approve_entry_QR_screen.dart'; 
+import 'package:app/controllers/qr_controller.dart';
+import 'package:app/view/entry_exit/approve_entry_QR_screen.dart';
 
 class ScanQRScreen extends StatefulWidget {
   const ScanQRScreen({super.key});
@@ -13,6 +13,37 @@ class ScanQRScreen extends StatefulWidget {
 class _ScanQRScreenState extends State<ScanQRScreen> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   QRViewController? controller;
+
+  void _onQRViewCreated(QRViewController qrController) {
+    controller = qrController;
+    final qrCtrl = QRController();
+
+    qrController.scannedDataStream.listen((scanData) async {
+      controller?.pauseCamera();
+      final data = qrCtrl.parseQRData(scanData.code);
+
+      if (data != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ApproveEntryScreen(
+              name: data.name,
+              lastname: data.lastname,
+              ci: data.id,
+              type: data.type,
+              phone: data.phone,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('QR inválido o datos incompletos')),
+        );
+        await Future.delayed(const Duration(seconds: 2));
+        controller?.resumeCamera();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,53 +63,9 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
     );
   }
 
-  void _onQRViewCreated(QRViewController controller) {
-    this.controller = controller;
-    controller.scannedDataStream.listen((scanData) async {
-      controller.pauseCamera(); // Pausar la cámara después de escanear
-
-      try {
-        // Decodificar el QR escaneado (json)
-        final Map<String, dynamic> data = jsonDecode(scanData.code ?? '{}');
-
-        // Verificar si los datos contienen las claves esperadas
-        if (data.containsKey('name') &&
-            data.containsKey('lastname') &&
-            data.containsKey('id') &&
-            data.containsKey('type') &&
-            data.containsKey('phone')) {
-          // Navegar a la pantalla de aprobación de ingreso
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => ApproveEntryScreen(
-                    name: data['name'] ?? '',
-                    lastname: data['lastname'] ?? '',
-                    ci: data['id'] ?? '',
-                    type: data['type'] ?? '',
-                    phone: data['phone'] ?? ''
-                  ),
-            ),
-          );
-        } else {
-          // Si faltan datos, mostrar un mensaje de error
-          throw Exception('Campos faltantes');
-        }
-      } catch (e) {
-        // Mostrar un SnackBar si ocurre un error
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('QR inválido o datos incompletos')),
-        );
-        await Future.delayed(const Duration(seconds: 2)); // Esperar 2 segundos
-        controller.resumeCamera(); // Reanudar la cámara para otro escaneo
-      }
-    });
-  }
-
   @override
   void dispose() {
-    controller?.dispose(); // Liberar los recursos de la cámara
+    controller?.dispose();
     super.dispose();
   }
 }

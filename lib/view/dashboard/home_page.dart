@@ -1,6 +1,5 @@
 import 'package:app/view/map/map_screen.dart';
 import 'package:app/view/news/news_screen.dart';
-import 'package:app/view/reports/reports_screen.dart';
 import 'package:app/view/entry_exit/entry_exit_screen.dart';
 import 'package:app/view/reports/new_report_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';

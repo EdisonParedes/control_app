@@ -1,6 +1,4 @@
-import 'package:app/view/qr/approve_entry_QR_screen.dart';
 import 'package:app/view/entry_exit/visitor_approval_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:app/view/map/map_screen.dart';

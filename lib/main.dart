@@ -1,7 +1,5 @@
-import 'package:app/view/qr/approve_entry_QR_screen.dart';
 import 'package:app/view/emergency/emergency_button.dart';
 import 'package:app/view/dashboard/home_page.dart';
-import 'package:app/services/location_permission_service.dart';
 import 'package:flutter/material.dart';
 import 'view/auth/login_page.dart';
 import 'firebase_options.dart';

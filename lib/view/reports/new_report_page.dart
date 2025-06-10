@@ -1,8 +1,6 @@
-import 'package:app/view/dashboard/home_page.dart';
-import 'package:app/view/reports/my_reports_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:app/controllers/report_controller.dart';
 import 'package:flutter/material.dart';
+import 'my_reports_page.dart';
 
 class NewReportPage extends StatefulWidget {
   const NewReportPage({super.key});
@@ -15,6 +13,8 @@ class _NewReportPageState extends State<NewReportPage> {
   final TextEditingController _incidentNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+
+  final ReportController _controller = ReportController();
 
   @override
   void dispose() {
@@ -34,24 +34,12 @@ class _NewReportPageState extends State<NewReportPage> {
       return;
     }
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _showSnackbar('Usuario no autenticado');
-      return;
-    }
-
     try {
-      final reportData = {
-        'title': title,
-        'description': description,
-        'location': location,
-        'status': 'pendiente',
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-        'userId': user.uid,
-      };
-
-      await FirebaseFirestore.instance.collection('reports').add(reportData);
+      await _controller.submitReport(
+        title: title,
+        description: description,
+        location: location,
+      );
 
       _showSnackbar('Reporte enviado exitosamente');
       _clearForm();
@@ -69,13 +57,14 @@ class _NewReportPageState extends State<NewReportPage> {
 
   void _showSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
+    // MISMO WIDGET TREE que el original
+    // (omitido aquí por espacio, puedes copiar el que ya tienes arriba sin cambios)
+    // Solo reemplaza el método _submitReport y todo lo demás queda igual.
     return Scaffold(
       appBar: AppBar(
         actions: [
@@ -99,23 +88,13 @@ class _NewReportPageState extends State<NewReportPage> {
               ),
               const SizedBox(height: 40),
               _buildLabel('Nombre del Incidente'),
-              _buildTextField(
-                controller: _incidentNameController,
-                label: 'Ej. Robo en la vía pública',
-              ),
+              _buildTextField(controller: _incidentNameController, label: 'Ej. Robo en la vía pública'),
               const SizedBox(height: 20),
               _buildLabel('Descripción'),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Detalles del incidente',
-                maxLines: 5,
-              ),
+              _buildTextField(controller: _descriptionController, label: 'Detalles del incidente', maxLines: 5),
               const SizedBox(height: 20),
               _buildLabel('Ubicación'),
-              _buildTextField(
-                controller: _locationController,
-                label: 'Ej. Calle 123, Ciudad',
-              ),
+              _buildTextField(controller: _locationController, label: 'Ej. Calle 123, Ciudad'),
               const SizedBox(height: 20),
               Center(child: _buildSubmitButton()),
             ],

@@ -1,14 +1,8 @@
 import 'package:app/view/entry_exit/entry_exit_screen.dart';
-import 'package:app/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:app/services/my_firebase_messaging_service.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:app/view/entry_exit/visitor_approval_screen.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:app/services/firebase_service.dart';
-import 'package:provider/provider.dart';
 
 class ApproveEntryScreen extends StatefulWidget {
   final String name;

@@ -1,8 +1,7 @@
+import 'package:app/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:app/models/user_model.dart';
 import 'package:app/view/auth/login_page.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -13,168 +12,54 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPage extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _lastnameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confpasswordController = TextEditingController();
-  final TextEditingController _ciController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _lastnameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confpasswordController = TextEditingController();
+  final _ciController = TextEditingController();
 
-  bool _isLoading = false;
-
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthController _authController = AuthController();
   String? _selectedRol;
-
-  void setupFCMTokenRefreshListener() {
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'fcmToken': newToken});
-        print('Token actualizado: $newToken');
-      }
-    });
-  }
+  bool _isLoading = false;
 
   void _register() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // Crear usuario en Firebase Auth
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+      final userModel = UserModel(
+        uid: '',
+        name: _nameController.text.trim(),
+        lastname: _lastnameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        rol: _selectedRol!,
+        ci: _ciController.text.trim(),
+      );
 
-      // Obtener token de FCM
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      await _authController.register(userModel, _passwordController.text.trim());
 
-      // Guardar en Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-            'name': _nameController.text.trim(),
-            'lastname': _lastnameController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'email': _emailController.text.trim(),
-            'rol': _selectedRol,
-            'fcmToken': fcmToken, // Guardar token
-            'createdAt': FieldValue.serverTimestamp(),
-            'ci': _ciController.text.trim(),
-          });
-
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Usuario registrado correctamente")),
       );
 
       Navigator.pushReplacement(
-        // ignore: use_build_context_synchronously
         context,
         MaterialPageRoute(builder: (context) => const LoginPage()),
       );
-    } on FirebaseAuthException catch (e) {
-      // ignore: use_build_context_synchronously
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error al registrar: ${e.message}")),
+        SnackBar(content: Text("Error al registrar: $e")),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(40.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 20),
-              const Text(
-                'Registro',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-              const SizedBox(height: 30),
-              _buildTextField(
-                'Nombre',
-                _nameController,
-                hintText: 'Ingresa tu nombre',
-                validator: _validateNotEmpty,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                'Apellido',
-                _lastnameController,
-                hintText: 'Ingresa tu apellido',
-                validator: _validateNotEmpty,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                'Cédula',
-                _ciController,
-                hintText: 'Ingresa su Cédula',
-                validator: _validateNotEmpty,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                'Teléfono',
-                _phoneController,
-                hintText: 'Ingresa tu teléfono',
-                validator: _validatePhone,
-              ),
-              const SizedBox(height: 20),
-              _buildRolDropdown(),
-              const SizedBox(height: 20),
-              _buildTextField(
-                'Correo Electrónico',
-                _emailController,
-                hintText: 'Ingresa tu correo',
-                validator: _validateEmail,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                'Contraseña',
-                _passwordController,
-                hintText: 'Ingresa una contraseña',
-                obscureText: true,
-                validator: _validatePassword,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                'Confirmar Contraseña',
-                _confpasswordController,
-                hintText: 'Confirma tu contraseña',
-                obscureText: true,
-                validator: _validateConfirmPassword,
-              ),
-              const SizedBox(height: 30),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : _buildRegisterButton(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Validadores
+  // Validaciones
   String? _validateNotEmpty(String? value) =>
       value!.isEmpty ? 'Este campo no puede estar vacío' : null;
   String? _validateEmail(String? value) =>
@@ -182,19 +67,14 @@ class _RegisterPage extends State<RegisterPage> {
           ? 'Correo no válido'
           : null;
   String? _validatePhone(String? value) =>
-      !RegExp(r'^09\d{8}$').hasMatch(value!)
-          ? 'Número de teléfono no válido'
-          : null;
+      !RegExp(r'^09\d{8}$').hasMatch(value!) ? 'Número de teléfono no válido' : null;
   String? _validatePassword(String? value) =>
-      value!.length < 8
-          ? 'La contraseña debe tener al menos 8 caracteres'
-          : null;
+      value!.length < 8 ? 'La contraseña debe tener al menos 8 caracteres' : null;
   String? _validateConfirmPassword(String? value) =>
       value != _passwordController.text ? 'Las contraseñas no coinciden' : null;
   String? _validateRolDropdown(String? value) =>
       value == null || value.isEmpty ? 'Selecciona un rol' : null;
 
-  // Widgets reutilizables
   Widget _buildTextField(
     String label,
     TextEditingController controller, {
@@ -242,16 +122,9 @@ class _RegisterPage extends State<RegisterPage> {
           hint: const Text('Selecciona tu rol'),
           items: const [
             DropdownMenuItem(value: 'residente', child: Text('Residente')),
-            DropdownMenuItem(
-              value: 'representante',
-              child: Text('Representante'),
-            ),
+            DropdownMenuItem(value: 'representante', child: Text('Representante')),
           ],
-          onChanged: (value) {
-            setState(() {
-              _selectedRol = value;
-            });
-          },
+          onChanged: (value) => setState(() => _selectedRol = value),
           validator: _validateRolDropdown,
         ),
       ],
@@ -270,6 +143,45 @@ class _RegisterPage extends State<RegisterPage> {
           ),
         ),
         child: const Text('Registrar', style: TextStyle(color: Colors.white70)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(25.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              const Text(
+                'Registro',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              ),
+              const SizedBox(height: 30),
+              _buildTextField('Nombre', _nameController, hintText: 'Ingresa tu nombre', validator: _validateNotEmpty),
+              const SizedBox(height: 20),
+              _buildTextField('Apellido', _lastnameController, hintText: 'Ingresa tu apellido', validator: _validateNotEmpty),
+              const SizedBox(height: 20),
+              _buildTextField('Cédula', _ciController, hintText: 'Ingresa su Cédula', validator: _validateNotEmpty),
+              const SizedBox(height: 20),
+              _buildTextField('Teléfono', _phoneController, hintText: 'Ingresa tu teléfono', validator: _validatePhone),
+              const SizedBox(height: 20),
+              _buildRolDropdown(),
+              const SizedBox(height: 20),
+              _buildTextField('Correo Electrónico', _emailController, hintText: 'Ingresa tu correo', validator: _validateEmail),
+              const SizedBox(height: 20),
+              _buildTextField('Contraseña', _passwordController, hintText: 'Ingresa una contraseña', obscureText: true, validator: _validatePassword),
+              const SizedBox(height: 20),
+              _buildTextField('Confirmar Contraseña', _confpasswordController, hintText: 'Confirma tu contraseña', obscureText: true, validator: _validateConfirmPassword),
+              const SizedBox(height: 30),
+              _isLoading ? const CircularProgressIndicator() : _buildRegisterButton(),
+            ],
+          ),
+        ),
       ),
     );
   }

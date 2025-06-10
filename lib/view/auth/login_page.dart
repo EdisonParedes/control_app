@@ -1,9 +1,6 @@
+import 'package:app/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:app/view/dashboard/home_page.dart';
-import 'package:app/view/auth/register.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,46 +15,35 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthController _authController = AuthController();
 
   void _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final user = await _authController.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
 
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Sesión iniciada correctamente")),
+        );
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .update({'fcmToken': fcmToken});
-
-      // ignore: use_build_context_synchronously
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Sesión iniciada correctamente")),
-      );
-
-      Navigator.pushReplacement(
-        // ignore: use_build_context_synchronously
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error al iniciar sesión: ${e.message}")),
+        SnackBar(content: Text("Error al iniciar sesión: $e")),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -65,26 +51,22 @@ class _LoginPageState extends State<LoginPage> {
     if (_emailController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            "Por favor, ingresa tu correo para recuperar la contraseña.",
-          ),
+          content: Text("Por favor, ingresa tu correo para recuperar la contraseña."),
         ),
       );
       return;
     }
 
     try {
-      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
+      await _authController.sendPasswordReset(_emailController.text.trim());
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            "Correo de recuperación enviado. Revisa tu bandeja de entrada.",
-          ),
+          content: Text("Correo de recuperación enviado. Revisa tu bandeja de entrada."),
         ),
       );
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error al enviar correo: ${e.message}")),
+        SnackBar(content: Text("Error al enviar correo: $e")),
       );
     }
   }
@@ -152,8 +134,7 @@ class _LoginPageState extends State<LoginPage> {
               _buildTextField(
                 'Correo electrónico',
                 _emailController,
-                validator:
-                    (value) => value!.isEmpty ? 'Ingresa tu correo' : null,
+                validator: (value) => value!.isEmpty ? 'Ingresa tu correo' : null,
               ),
               _buildForgotPassword(),
               const SizedBox(height: 10),
@@ -161,13 +142,11 @@ class _LoginPageState extends State<LoginPage> {
                 'Contraseña',
                 _passwordController,
                 obscureText: true,
-                validator:
-                    (value) => value!.isEmpty ? 'Ingresa tu contraseña' : null,
+                validator: (value) => value!.isEmpty ? 'Ingresa tu contraseña' : null,
               ),
               const SizedBox(height: 40),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : _buildLoginButton(),
+              _isLoading ? const CircularProgressIndicator() : _buildLoginButton(),
+              const SizedBox(height: 20),
             ],
           ),
         ),

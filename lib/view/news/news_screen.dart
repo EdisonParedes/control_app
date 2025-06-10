@@ -1,8 +1,10 @@
-import 'package:app/view/news/new_news_screen.dart';
+import 'package:app/services/firebase_service.dart';
+import 'package:app/view/news/add_news_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:app/controllers/news_controller.dart';
 import 'package:app/services/user_session.dart';
+import 'package:app/models/news_model.dart';
+import 'package:provider/provider.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -12,90 +14,81 @@ class NewsScreen extends StatefulWidget {
 }
 
 class _NewsScreenState extends State<NewsScreen> {
-  late Future<void> _cargarDatosFuturo;
+  late Future<List<News>> _noticias;
+  // ignore: unused_field
+  late List<String> _tiposNoticia;
+  late NewsController _controller;
 
   @override
   void initState() {
     super.initState();
-    _cargarDatosFuturo = context.read<UserSession>().cargarDatosUsuario();
-  }
-
-  DateTime? _parseDate(dynamic value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is String) return DateTime.tryParse(value);
-    return null;
+    _controller = NewsController(
+      FirebaseService(),
+      context.read<UserSession>(),
+    );
+    _noticias = _controller.obtenerNoticias();
+    _controller.getTiposNoticia().then((tipos) {
+      setState(() {
+        _tiposNoticia = tipos;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _cargarDatosFuturo,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final esRepresentante = context.read<UserSession>().esRepresentante();
 
-        return Column(
-          children: [
-            if (context.read<UserSession>().esAdmin() ||
-                context.read<UserSession>().esRepresentante())
-              Padding(
-                padding: const EdgeInsets.only(top: 50),
-                child: _buildNewNewsButton(context),
-              ),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('news')
-                        .orderBy('date', descending: true)
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Text('No hay noticias disponibles.'),
-                    );
-                  }
-
-                  final noticias = snapshot.data!.docs;
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(20),
-                    separatorBuilder: (_, __) => const Divider(),
-                    itemCount: noticias.length,
-                    itemBuilder: (context, index) {
-                      final noticia =
-                          noticias[index].data() as Map<String, dynamic>;
-                      final title = noticia['title'] ?? '';
-                      //final description = noticia['description'] ?? '';
-                      final source = noticia['source'] ?? '';
-                      final date = _parseDate(noticia['date']);
-
-                      return ListTile(
-                        leading: _iconoConColor(noticia['type'] ?? ''),
-                        title: Text(title),
-                        subtitle: Text(
-                          '${_formatDate(date)} - Fuente: $source',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+    return Scaffold(
+      body: Column(
+        children: [
+          if (esRepresentante)
+            Padding(
+              padding: const EdgeInsets.only(top: 50),
+              child: _buildNewNewsButton(context),
             ),
-          ],
-        );
-      },
+          Expanded(
+            child: FutureBuilder<List<News>>(
+              future: _noticias,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                final noticias = snapshot.data ?? [];
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: ListView.separated(
+                      itemCount: noticias.length,
+                      separatorBuilder:
+                          (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final noticia = noticias[index];
+                        return ListTile(
+                          title: Text(noticia.title),
+                          subtitle: Text(
+                            '${_formatDate(noticia.date)} - Fuente: ${noticia.source}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          leading: _iconoConColor(noticia.type ?? ''),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'Fecha desconocida';
+  String _formatDate(DateTime date) {
     final duration = DateTime.now().difference(date);
 
     if (duration.inMinutes < 60) {
@@ -104,6 +97,21 @@ class _NewsScreenState extends State<NewsScreen> {
       return 'Hace ${duration.inHours} horas';
     } else {
       return 'Hace ${duration.inDays} días';
+    }
+  }
+
+  Icon _iconoConColor(String tipo) {
+    switch (tipo) {
+      case 'Emergencia':
+        return Icon(Icons.warning, color: Colors.red);
+      case 'Seguridad':
+        return Icon(Icons.security, color: Colors.blue);
+      case 'Evento':
+        return Icon(Icons.event, color: Colors.green);
+      case 'Comunidad':
+        return Icon(Icons.people, color: Colors.orange);
+      default:
+        return Icon(Icons.article, color: Colors.grey);
     }
   }
 
@@ -129,20 +137,5 @@ class _NewsScreenState extends State<NewsScreen> {
         ),
       ),
     );
-  }
-}
-
-Icon _iconoConColor(String tipo) {
-  switch (tipo) {
-    case 'Emergencia':
-      return Icon(Icons.warning, color: Colors.red);
-    case 'Seguridad':
-      return Icon(Icons.security, color: Colors.blue);
-    case 'Evento':
-      return Icon(Icons.event, color: Colors.green);
-    case 'Comunidad':
-      return Icon(Icons.people, color: Colors.orange);
-    default:
-      return Icon(Icons.article, color: Colors.grey);
   }
 }

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../controllers/visit_reason_controller.dart';
+import '../../../models/visit_reason_model.dart';
 
 class ManagerVisitReasons extends StatefulWidget {
   final VoidCallback onActualizar;
@@ -11,42 +13,20 @@ class ManagerVisitReasons extends StatefulWidget {
 }
 
 class _ManagerVisitReasonsState extends State<ManagerVisitReasons> {
-  final TextEditingController _nuevoMotivoController = TextEditingController();
-  List<QueryDocumentSnapshot> _motivos = [];
+  final model = VisitReasonModel();
+  late VisitReasonController controller;
+  List<QueryDocumentSnapshot> motivos = [];
 
   @override
   void initState() {
     super.initState();
-    _cargarMotivos();
+    controller = VisitReasonController(model);
+    _loadMotivos();
   }
 
-  Future<void> _cargarMotivos() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('reason_visit').get();
-    setState(() {
-      _motivos = snapshot.docs;
-    });
-  }
-
-  Future<void> _agregarMotivo() async {
-    final texto = _nuevoMotivoController.text.trim();
-    if (texto.isEmpty) return;
-
-    await FirebaseFirestore.instance.collection('reason_visit').add({
-      'name': texto,
-    });
-    _nuevoMotivoController.clear();
-    _cargarMotivos();
-    widget.onActualizar();
-  }
-
-  Future<void> _eliminarMotivo(String docId) async {
-    await FirebaseFirestore.instance
-        .collection('reason_visit')
-        .doc(docId)
-        .delete();
-    _cargarMotivos();
-    widget.onActualizar();
+  Future<void> _loadMotivos() async {
+    motivos = await controller.cargarMotivos();
+    setState(() {});
   }
 
   @override
@@ -60,12 +40,17 @@ class _ManagerVisitReasonsState extends State<ManagerVisitReasons> {
         ),
         const SizedBox(height: 10),
         TextField(
-          controller: _nuevoMotivoController,
+          controller: controller.motivoController,
           decoration: InputDecoration(
             labelText: 'Nuevo motivo',
             suffixIcon: IconButton(
               icon: const Icon(Icons.add),
-              onPressed: _agregarMotivo,
+              onPressed: () async {
+                await controller.agregarMotivo(() async {
+                  await _loadMotivos();
+                  widget.onActualizar();
+                });
+              },
             ),
             border: const OutlineInputBorder(),
           ),
@@ -73,14 +58,19 @@ class _ManagerVisitReasonsState extends State<ManagerVisitReasons> {
         const SizedBox(height: 10),
         ListView.builder(
           shrinkWrap: true,
-          itemCount: _motivos.length,
+          itemCount: motivos.length,
           itemBuilder: (context, index) {
-            final doc = _motivos[index];
+            final doc = motivos[index];
             return ListTile(
               title: Text(doc['name']),
               trailing: IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _eliminarMotivo(doc.id),
+                onPressed: () async {
+                  await controller.eliminarMotivo(doc.id, () async {
+                    await _loadMotivos();
+                    widget.onActualizar();
+                  });
+                },
               ),
             );
           },

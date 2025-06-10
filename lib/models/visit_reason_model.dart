@@ -1,0 +1,3 @@
+class VisitReasonModel {
+  String nuevoMotivo = '';
+}

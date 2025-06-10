@@ -1,9 +1,10 @@
-import 'package:app/screens/manager_type_news.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Asegúrate de importar Provider
-import 'package:app/services/user_session.dart'; // Asegúrate de importar UserSession
+import 'package:app/controllers/news_controller.dart';
+import 'package:app/models/news_model.dart';
+import 'package:app/view/manager/manager_type_news.dart';
 import 'package:app/services/firebase_service.dart';
+import 'package:app/services/user_session.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class NewNewsScreen extends StatefulWidget {
   const NewNewsScreen({super.key});
@@ -17,19 +18,26 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
   final _tituloController = TextEditingController();
   final _descripcionController = TextEditingController();
   final _fuenteController = TextEditingController();
-  late Future<void> _cargarDatosFuturo;
 
-  String? _tipoNoticiaSeleccionado;
-
+  late NewsController _controller;
   List<String> _tiposNoticia = [];
+  String? _tipoNoticiaSeleccionado;
 
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _cargarDatosFuturo = context.read<UserSession>().cargarDatosUsuario();
-    _obtenerListaTipoNoticias();
+    final userSession = context.read<UserSession>();
+    _controller = NewsController(FirebaseService(), userSession);
+    _loadTiposNoticia();
+  }
+
+  Future<void> _loadTiposNoticia() async {
+    final tipos = await _controller.getTiposNoticia();
+    setState(() {
+      _tiposNoticia = tipos;
+    });
   }
 
   Future<void> _guardarNoticia() async {
@@ -37,18 +45,19 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
 
     setState(() => _isLoading = true);
 
-    try {
-      final docRef = FirebaseFirestore.instance.collection('news').doc();
+    final userSession = context.read<UserSession>();
+    final noticia = News(
+      id: '',
+      title: _tituloController.text.trim(),
+      description: _descripcionController.text.trim(),
+      source: _fuenteController.text.trim(),
+      type: _tipoNoticiaSeleccionado,
+      date: DateTime.now(),
+      userId: userSession.userId!,
+    );
 
-      await docRef.set({
-        'id': docRef.id,
-        'title': _tituloController.text.trim(),
-        'description': _descripcionController.text.trim(),
-        'source': _fuenteController.text.trim(),
-        'type': _tipoNoticiaSeleccionado,
-        'date': FieldValue.serverTimestamp(),
-        'userId': context.read<UserSession>().userId,
-      });
+    try {
+      await _controller.guardarNoticia(noticia);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -119,13 +128,6 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
     );
   }
 
-  void _obtenerListaTipoNoticias() async {
-    final tipoNoticias = await FirebaseService.getNewsTypes();
-    setState(() {
-      _tiposNoticia = tipoNoticias;
-    });
-  }
-
   void _crudTypeNews() {
     showModalBottomSheet(
       context: context,
@@ -139,7 +141,7 @@ class _NewNewsScreenState extends State<NewNewsScreen> {
             child: ManagerTypeNews(
               onActualizar: () async {
                 final tiposNoticiaActualizado =
-                    await FirebaseService.getVisitReasons();
+                    await FirebaseService.getNewsTypes();
                 setState(() => _tiposNoticia = tiposNoticiaActualizado);
               },
             ),

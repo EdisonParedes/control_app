@@ -40,7 +40,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error al iniciar sesión: $e")),
+        SnackBar(content: Text("Error al iniciar sesión: Usuario o Contraseña no encontrados")),
       );
     } finally {
       setState(() => _isLoading = false);

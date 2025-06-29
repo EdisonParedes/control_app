@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:app/view/export/pdf_generation.dart';
-import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -34,6 +33,8 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   bool _isLoading = false;
   bool _isExportingPdf = false;
   List<String> tiposAcceso = ['Ingreso', 'Salida'];
+  DateTime? _fechaInicio;
+  DateTime? _fechaFin;
 
   String _accessType = 'Ingreso';
   String _personType = 'Residente';
@@ -44,6 +45,9 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   void initState() {
     super.initState();
     _cargarMotivosVisita();
+    final now = DateTime.now();
+    _fechaInicio = DateTime(now.year, now.month, now.day);
+    _fechaFin = DateTime(now.year, now.month, now.day, 23, 59, 59);
   }
 
   Future<void> _registerAccess() async {
@@ -206,6 +210,24 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     setState(() => _isLoading = false);
   }
 
+  Future<void> _seleccionarFechas(BuildContext context) async {
+    final rango = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _fechaInicio!, end: _fechaFin!),
+    );
+
+    if (rango != null) {
+      setState(() {
+        _fechaInicio = rango.start;
+        _fechaFin = rango.end.add(
+          const Duration(hours: 23, minutes: 59, seconds: 59),
+        );
+      });
+    }
+  }
+
   Future<bool> isAuthorizedUser() async {
     final session = context.read<UserSession>();
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -266,16 +288,15 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
     return query.docs.isNotEmpty;
   }
 
-  Future<List<Map<String, dynamic>>> obtenerDatosDeAccesos() async {
-    final now = DateTime.now();
-    final inicioDelDia = DateTime(now.year, now.month, now.day);
-    final finDelDia = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
+  Future<List<Map<String, dynamic>>> obtenerDatosDeAccesos({
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
+  }) async {
     final snapshot =
         await FirebaseFirestore.instance
             .collection('access')
-            .where('timestamp', isGreaterThanOrEqualTo: inicioDelDia)
-            .where('timestamp', isLessThanOrEqualTo: finDelDia)
+            .where('timestamp', isGreaterThanOrEqualTo: fechaInicio)
+            .where('timestamp', isLessThanOrEqualTo: fechaFin)
             .orderBy('timestamp', descending: true)
             .get();
 
@@ -300,13 +321,39 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
   }
 
   Future<void> _exportToPdf() async {
-    final datos = await obtenerDatosDeAccesos();
+    if (_fechaInicio == null || _fechaFin == null) return;
+
+    final datos = await obtenerDatosDeAccesos(
+      fechaInicio: _fechaInicio!,
+      fechaFin: _fechaFin!,
+    );
+
+    if (datos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay datos en el rango seleccionado.')),
+      );
+      return;
+    }
+
     final pdfData = await PdfGenerator.generatePdf(datos);
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdfData);
+    await Printing.layoutPdf(onLayout: (format) async => pdfData);
   }
 
   Future<void> _exportToExcel() async {
-    final data = await obtenerDatosDeAccesos();
+    if (_fechaInicio == null || _fechaFin == null) return;
+
+    final data = await obtenerDatosDeAccesos(
+      fechaInicio: _fechaInicio!,
+      fechaFin: _fechaFin!,
+    );
+
+    if (data.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay datos en el rango seleccionado.')),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ExcelPreviewScreen(ingresos: data)),
@@ -692,15 +739,52 @@ class _EntryExitScreenState extends State<EntryExitScreen> {
                             );
                           } else if (snapshot.hasData &&
                               snapshot.data == true) {
-                            return Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _buildExportPdfButton(),
-                                  const SizedBox(width: 5),
-                                  _buildExportExcelButton(),
-                                ],
-                              ),
+                            return Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Desde: ${_fechaInicio?.toLocal().toString().split(' ')[0]}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Hasta: ${_fechaFin?.toLocal().toString().split(' ')[0]}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 10),
+                                ElevatedButton(
+                                  onPressed: () => _seleccionarFechas(context),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Cambiar fechas',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildExportPdfButton(),
+                                    const SizedBox(width: 5),
+                                    _buildExportExcelButton(),
+                                  ],
+                                ),
+                              ],
                             );
                           } else {
                             return const SizedBox();

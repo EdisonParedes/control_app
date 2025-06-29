@@ -54,6 +54,8 @@ dependencies:
   googleapis_auth: ^2.0.0
   firebase_cloud_firestore: ^5.4.4
   flutter_local_notifications: ^19.1.0
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

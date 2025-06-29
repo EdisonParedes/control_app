@@ -1,6 +1,7 @@
 import 'package:app/view/emergency/emergency_button.dart';
 import 'package:app/view/dashboard/home_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // ← necesario
 import 'view/auth/login_page.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -9,7 +10,6 @@ import 'package:app/services/my_firebase_messaging_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app/services/user_session.dart';
 
-// Definir el GlobalKey para el navigator globalmente
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
@@ -40,6 +40,15 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
+      locale: const Locale('es'), // ← fuerza español
+      supportedLocales: const [
+        Locale('es'), // Español
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(primarySwatch: Colors.blue),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),

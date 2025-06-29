@@ -13,6 +13,7 @@ class _NewReportPageState extends State<NewReportPage> {
   final TextEditingController _incidentNameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+  bool _isLoading = false;
 
   final ReportController _controller = ReportController();
 
@@ -33,6 +34,7 @@ class _NewReportPageState extends State<NewReportPage> {
       _showSnackbar('Por favor, completa todos los campos');
       return;
     }
+    setState(() => _isLoading = true);
 
     try {
       await _controller.submitReport(
@@ -57,7 +59,9 @@ class _NewReportPageState extends State<NewReportPage> {
 
   void _showSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -88,13 +92,23 @@ class _NewReportPageState extends State<NewReportPage> {
               ),
               const SizedBox(height: 40),
               _buildLabel('Nombre del Incidente'),
-              _buildTextField(controller: _incidentNameController, label: 'Ej. Robo en la vía pública'),
+              _buildTextField(
+                controller: _incidentNameController,
+                label: 'Ej. Robo en la vía pública',
+              ),
               const SizedBox(height: 20),
               _buildLabel('Descripción'),
-              _buildTextField(controller: _descriptionController, label: 'Detalles del incidente', maxLines: 5),
+              _buildTextField(
+                controller: _descriptionController,
+                label: 'Detalles del incidente',
+                maxLines: 5,
+              ),
               const SizedBox(height: 20),
               _buildLabel('Ubicación'),
-              _buildTextField(controller: _locationController, label: 'Ej. Calle 123, Ciudad'),
+              _buildTextField(
+                controller: _locationController,
+                label: 'Ej. Calle 123, Ciudad',
+              ),
               const SizedBox(height: 20),
               Center(child: _buildSubmitButton()),
             ],
@@ -127,17 +141,27 @@ class _NewReportPageState extends State<NewReportPage> {
     return SizedBox(
       width: 150,
       child: ElevatedButton(
-        onPressed: _submitReport,
+        onPressed: _isLoading ? null :_submitReport,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        child: const Text(
-          'Enviar Reporte',
-          style: TextStyle(color: Colors.white70),
-        ),
+        child:
+            _isLoading
+                ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : const Text(
+                  'Enviar Reporte',
+                  style: TextStyle(color: Colors.white70),
+                ),
       ),
     );
   }
